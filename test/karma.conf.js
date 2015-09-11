@@ -28,7 +28,8 @@ module.exports = function(config) {
       mocha: { 'ui': 'tdd' }
     },
 
-    // enable / disable watching file and executing tests whenever any file changes
+    // enable / disable watching file and
+    // executing tests whenever any file changes
     autoWatch: true,
 
     customLaunchers: {
@@ -39,7 +40,8 @@ module.exports = function(config) {
     },
 
     // start these browsers
-    // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
+    // available browser launchers:
+    // https://npmjs.org/browse/keyword/karma-launcher
     browsers: ['firefox_latest'],
 
     // Continuous Integration mode
