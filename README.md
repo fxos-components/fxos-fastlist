@@ -31,7 +31,7 @@ list.model = [
 ];
 ```
 
-### Sections
+## Sections
 
 To group list-items into sections, define a `getSectionName()` function before assigning a `model`.
 
@@ -50,7 +50,28 @@ list.model = [
 ];
 ```
 
-### Optimizing with `top` & `bottom`
+## Caching
+
+The optional caching feature will cache rendered list-items and section HTML in `localStorage`. On second render we inject the cached HTML right away for a really fast first-paint. This way the user see some content right away, giving you time to fetch your model behind the scenes.
+
+```html
+<gaia-fast-list caching>
+  <template>
+    ...
+  </template>
+</gaia-fast-list>
+```
+
+```js
+// setting the model will
+// replace cached content
+list.model = [...]
+
+// you can clear caches if need be
+list.clearCache();
+```
+
+## Optimizing reflows
 
 Defining `top` and `bottom` offsets avoids the component having to read dimensions from the DOM, which can be costly. The following example is for a list that occupies the entire vertical screen space.
 
@@ -62,7 +83,7 @@ Defining `top` and `bottom` offsets avoids the component having to read dimensio
 </gaia-fast-list>
 ```
 
-### Offset
+## Offsetting content
 
 Sometimes you may require elements other than list-items within your scrollable region (eg. a search field). The `offset` attribute allows you to define a value which all list content will be offset by. The value should usually be the height of your 'foreign' element.
 
