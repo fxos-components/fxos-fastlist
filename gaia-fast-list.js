@@ -1,4 +1,4 @@
-;(function(define){'use strict';define(function(require,exports,module){
+;(function(define){define(function(require,exports,module){
 
 /**
  * Dependencies
@@ -13,7 +13,7 @@ require('gaia-sub-header');
 /**
  * Mini Logger
  */
-var debug = 0 ? (...args) => console.log('[GaiaFastList]', ...args) : ()=>{};
+var debug = 0 ? (...args) => console.log('[GaiaFastList]', ...args) : () => {};
 
 /**
  * Used to hide private poperties behind.
@@ -28,7 +28,7 @@ var internal = Symbol();
 var GaiaFastListProto = {
   extensible: false,
 
-  created: function() {
+  created() {
     debug('create');
     this.setupShadowRoot();
     this.top = this.getAttribute('top');
@@ -39,29 +39,66 @@ var GaiaFastListProto = {
     debug('created');
   },
 
-  configure: function(props) {
+  /**
+   * Used to define configuration passed
+   * to internal FastList instantiation.
+   *
+   * NOTE: Must be called before `model`
+   * if defined.
+   *
+   * @param  {Object} props
+   */
+  configure(props) {
     debug('configure');
     this[internal].configure(props);
   },
 
-  complete: function() {
+  /**
+   * Should be called by the user when
+   * they have finished incrementally
+   * updating there model.
+   *
+   * This acts as an internal hook used
+   * for updating caches.
+   *
+   * This only really concerns users
+   * who are using caching and fetching
+   * their model in chunks.
+   *
+   * @public
+   */
+  complete() {
     if (!this.caching) return;
-
+    debug('complete');
     this[internal].cachedHeight = null;
     this[internal].updateCachedHeight();
   },
 
+  /**
+   * Clear cached height and html.
+   *
+   * @public
+   */
+  clearCache() {
+    debug('clear cache');
+    this[internal].clearCache();
+  },
+
+  /**
+   * Public attributes/properties configuration
+   * used by gaia-component.js.
+   *
+   * @type {Object}
+   */
   attrs: {
     model: {
-      get: function() { return this[internal].model; },
-      set: function(value) {
-        this[internal].setModel(value);
-      }
+      get() { return this[internal].model; },
+      set(value) { this[internal].setModel(value); }
     },
 
     top: {
-      get: function() { return this._top; },
-      set: function(value) {
+      get() { return this._top; },
+      set(value) {
         debug('set top', value);
         if (value == null) return;
         value = Number(value);
@@ -72,8 +109,8 @@ var GaiaFastListProto = {
     },
 
     bottom: {
-      get: function() { return this._bottom; },
-      set: function(value) {
+      get() { return this._bottom; },
+      set(value) {
         debug('set bottom', value);
         if (value == null) return;
         value = Number(value);
@@ -262,7 +299,9 @@ var GaiaFastListProto = {
         color: var(--text-color-minus);
         background: var(--background);
       }
-    </style>`
+    </style>`,
+
+  FastList: FastList // test hook
 };
 
 /**
@@ -277,15 +316,24 @@ function Internal(el) {
   this.itemContainer = el;
   this.configureTemplates();
   this.setEmpty(!this.cacheRendered);
-  debug('config init', this);
+  debug('internal initialized');
 }
 
 Internal.prototype = {
   headerHeight: 40,
   itemHeight: 60,
 
-  setModel: function(model) {
-    debug('set model', model);
+  /**
+   * Setting the model for the first
+   * time creates a new FastList. Setting
+   * it subsequent times rerenders
+   * the FastList with the new data.
+   *
+   * @param {Array} model
+   * @private
+   */
+  setModel(model) {
+    debug('set model');
     if (!model) return;
     this.model = model;
     this.sections = this.sectionize(model);
@@ -294,7 +342,13 @@ Internal.prototype = {
     this.setEmpty(false);
   },
 
-  setEmpty: function(value) {
+  /**
+   * Toggle some basic placeholder styling
+   * when we don't have any items to render.
+   *
+   * @param {Boolean} value
+   */
+  setEmpty(value) {
     this.container.classList.toggle('empty', value);
   },
 
@@ -305,16 +359,22 @@ Internal.prototype = {
    * @param  {Array} items
    * @return {Object}
    */
-  sectionize: function(items) {
-    debug('sectionize', items);
-    if (!this.getSectionName) return;
+  sectionize(items) {
+    debug('sectionize');
+    var sectioned = !!this.getSectionName;
     var hash = {};
 
     for (var i = 0, l = items.length; i < l; i++) {
       var item = items[i];
-      var section = this.getSectionName(item);
+      var section = sectioned && this.getSectionName(item);
 
-      if (!section) continue;
+      // When a section is not defined, flag
+      // first list items and skip logic
+      if (!section) {
+        if (i === 0) item.gfl_isFirst = true;
+        else if (item.gfl_isFirst) delete item.gfl_isFirst;
+        continue;
+      }
 
       // When there is no section yet
       // we can assume that this item
@@ -333,26 +393,55 @@ Internal.prototype = {
       hash[section].push(item);
     }
 
-    return hash;
+    return sectioned && hash;
   },
 
-  createList: function() {
+  /**
+   * Creates the FastList and caches
+   * the rendered content.
+   *
+   * Layerizing is the process of turning
+   * each list-item into its own layer.
+   * It's expensive so we defer it till
+   * after the first-paint.
+   *
+   * @private
+   */
+  createList() {
     debug('create list');
-    this.fastList = new FastList(this);
-    setTimeout(() => this.layerize(), 360);
-    this.updateCache();
+    this.fastList = new this.el.FastList(this);
+    this.fastList.rendered.then(() => {
+      setTimeout(() => this.layerize(), 360);
+      this.updateCachedHtml();
+    });
   },
 
-  layerize: function() {
+  /**
+   * Makes the list scrollable and creates
+   * a layer out of each list-item.
+   *
+   * @private
+   */
+  layerize() {
     this.el.classList.add('layerize');
     this.container.classList.add('layerize');
   },
 
-  configure: function(props) {
+  configure(props) {
     Object.assign(this, props);
   },
 
-  configureTemplates: function() {
+  /**
+   * Defines the templates to be used
+   * for the sections and items.
+   *
+   * Users can provide templates by
+   * placing <template> in the root
+   * of their <gaia-fast-list>
+   *
+   * @private
+   */
+  configureTemplates() {
     var templateHeader = this.el.querySelector('template[header]');
     var templateItem = this.el.querySelector('template[item]');
     var noTemplates = !templateItem && !templateHeader;
@@ -371,7 +460,13 @@ Internal.prototype = {
     }
   },
 
-  createItem: function() {
+  /**
+   * Called by FastList when it needs
+   * to create a list-item element.
+   *
+   * @return {HTMLElement}
+   */
+  createItem() {
     debug('create item');
     this.parsedItem = this.parsedItem || poplar.parse(this.templateItem);
     var el = poplar.create(this.parsedItem.cloneNode(true));
@@ -379,7 +474,13 @@ Internal.prototype = {
     return el;
   },
 
-  createSection: function() {
+  /**
+   * Called by FastList when it needs
+   * to create a section element.
+   *
+   * @return {HTMLElement}
+   */
+  createSection() {
     this.parsedSection = this.parsedSection || poplar.parse(this.templateHeader);
     var header = poplar.create(this.parsedSection.cloneNode(true));
 
@@ -406,7 +507,7 @@ Internal.prototype = {
    * @param  {HTMLElement} el
    * @param  {Number} i
    */
-  populateItem: function(el, i) {
+  populateItem(el, i) {
     var record = this.getRecordAt(i);
     var successful = poplar.populate(el, record);
 
@@ -418,11 +519,18 @@ Internal.prototype = {
     }
 
     el.style.borderTop = !record.gfl_isFirst
-      ? 'solid 1px var(--border-color)'
+      ? 'solid 1px var(--border-color, #e7e7e7)'
       : '0';
   },
 
-  populateSection: function(el, section) {
+  /**
+   * Called by FastList when it needs
+   * to populate a section with content.
+   *
+   * @param  {HTMLElement} el
+   * @param  {String} section
+   */
+  populateSection(el, section) {
     var title = el.firstChild;
     var background = title.nextSibling;
     var height = this.getFullSectionHeight(section);
@@ -431,37 +539,48 @@ Internal.prototype = {
     background.style.height = height + 'px';
   },
 
-  getViewportHeight: function() {
+  /**
+   * Called by FastList when it needs to
+   * know the height of the list viewport.
+   *
+   * If the user has provided `top` and `bottom`
+   * attributes we can calculate this value
+   * for free, else we must force a reflow
+   * by using `clientHeight`.
+   *
+   * @return {Number}
+   */
+  getViewportHeight() {
     debug('get viewport height');
     var bottom = this.el.bottom;
     var top = this.el.top;
 
     return (top != null && bottom != null)
       ? window.innerHeight - top - bottom
-      : this.el.offsetHeight;
+      : this.el.clientHeight;
   },
 
-  getSections: function() {
+  getSections() {
     return Object.keys(this.sections || {});
   },
 
-  hasSections: function() {
+  hasSections() {
     return !!this.getSections().length;
   },
 
-  getSectionHeaderHeight: function() {
+  getSectionHeaderHeight() {
     return this.hasSections() ? this.headerHeight : 0;
   },
 
-  getFullSectionHeight: function(key) {
+  getFullSectionHeight(key) {
     return this.sections[key].length * this.getItemHeight();
   },
 
-  getFullSectionLength: function(key) {
+  getFullSectionLength(key) {
     return this.sections[key].length;
   },
 
-  getRecordAt: function(index) {
+  getRecordAt(index) {
     return this.model[index];
   },
 
@@ -473,12 +592,12 @@ Internal.prototype = {
   // formatting before setting the model.
   getSectionName: undefined,
 
-  getSectionFor: function(index) {
+  getSectionFor(index) {
     var item = this.getRecordAt(index);
     return this.getSectionName && this.getSectionName(item);
   },
 
-  eachSection: function(fn) {
+  eachSection(fn) {
     var sections = this.getSections();
     var result;
 
@@ -492,7 +611,7 @@ Internal.prototype = {
     }
   },
 
-  getIndexAtPosition: function(pos) {
+  getIndexAtPosition(pos) {
     // debug('get index at position', pos);
     var sections = this.sections || [this.model];
     var headerHeight = this.getSectionHeaderHeight();
@@ -518,12 +637,8 @@ Internal.prototype = {
       // Each item in section
       for (var i = 0; i < items.length; i++) {
         pos -= itemHeight;
-
-        if (pos <= 0 || index === fullLength - 1) {
-          break; // found it!
-        } else {
-          index++; // continue
-        }
+        if (pos <= 0 || index === fullLength - 1) break; // found it!
+        else index++; // continue
       }
     }
 
@@ -531,7 +646,7 @@ Internal.prototype = {
     return index;
   },
 
-  getPositionForIndex: function(index) {
+  getPositionForIndex(index) {
     // debug('get position for index', index);
     var sections = this.sections || [this.model];
     var headerHeight = this.getSectionHeaderHeight();
@@ -555,15 +670,16 @@ Internal.prototype = {
     return top;
   },
 
-  getFullLength: function() {
+  getFullLength() {
     return this.model.length;
   },
 
-  getItemHeight: function() {
+  getItemHeight() {
     return this.itemHeight;
   },
 
-  getFullHeight: function() {
+  getFullHeight() {
+    debug('get full height', this.cachedHeight);
     var height = this.cachedHeight;
     if (height != null) return height;
 
@@ -572,7 +688,7 @@ Internal.prototype = {
     return headers + items + this.el.offset;
   },
 
-  insertAtIndex: function(index, record, toSection) {
+  insertAtIndex(index, record, toSection) {
     this._cachedLength = null;
     return this.eachSection(function(key, items) {
       if (index < items.length || key === toSection) {
@@ -583,33 +699,73 @@ Internal.prototype = {
     });
   },
 
-  replaceAtIndex: function(index, record) {
+  replaceAtIndex(index, record) {
     return this.eachSection(function(key, items) {
-      if (index < items.length) {
-        return items.splice(index, 1, record);
-      }
-
+      if (index < items.length) return items.splice(index, 1, record);
       index -= items.length;
     });
   },
 
-  removeAtIndex: function(index) {
+  removeAtIndex(index) {
     this._cachedLength = null;
     return this.eachSection(function(key, items) {
-      if (index < items.length) {
-        return items.splice(index, 1)[0];
-      }
-
+      if (index < items.length) return items.splice(index, 1)[0];
       index -= items.length;
     });
   },
 
-  getCacheKey: function() {
-    return `${this.el.tagName}:${this.el.id}:${location}`;
+  /**
+   * Get a some cached data by key.
+   *
+   * @param  {String} key
+   * @return {String}
+   */
+  getCache(key) {
+    return localStorage.getItem(`${this.getCacheKey()}:${key}`);
   },
 
-  getCachedHeightKey: function() {
-    return `${this.el.tagName}:${this.el.id}:${location}:height`;
+  /**
+   * Store some data in the cache.
+   *
+   * The scheduler.mutation() block means that
+   * it won't interupt user scrolling.
+   *
+   * @param {String} key
+   * @param {String} value
+   */
+  setCache(key, value) {
+    debug('set cache (sync)', key);
+    setTimeout(() => {
+      scheduler.mutation(() => {
+        localStorage.setItem(`${this.getCacheKey()}:${key}`, value);
+        debug('set cache (async)', key);
+      });
+    }, 500);
+  },
+
+  /**
+   * Clear all caches.
+   */
+  clearCache() {
+    debug('clear cache');
+    var prefix = this.getCacheKey();
+    localStorage.removeItem(`${prefix}:html`);
+    localStorage.removeItem(`${prefix}:height`);
+  },
+
+  /**
+   * Attempts to generate a storage
+   * key prefix unique to this list.
+   *
+   * Assuming two unique lists don't
+   * use caching on the same url, if
+   * this feature is required, they
+   * must be given unique id attributes.
+   *
+   * @return {String}
+   */
+  getCacheKey() {
+    return `${this.el.tagName}:${this.el.id}:${location}`;
   },
 
   /**
@@ -617,43 +773,29 @@ Internal.prototype = {
    * HTML and then persists it to localStorage later
    * in time to prevent blocking the remaining
    * fast-list setup.
-   *
-   * The scheduler.mutation() block means that
-   * it won't interupt user scrolling.
    */
-  updateCache: function() {
+  updateCachedHtml() {
     if (!this.el.caching) return;
+    debug('update cached html');
     var items = this.el.querySelectorAll('.gfl-item, .gfl-section');
     var html = [].map.call(items, el => el.outerHTML).join('');
-
-    setTimeout(() => {
-      scheduler.mutation(() => {
-        localStorage.setItem(this.getCacheKey(), html);
-      });
-    }, 500);
+    this.setCache('html', html);
   },
 
-  updateCachedHeight: function() {
+  updateCachedHeight() {
     if (!this.el.caching) return;
-    var height = this.getFullHeight();
-
-    setTimeout(() => {
-      scheduler.mutation(() => {
-        localStorage.setItem(this.getCachedHeightKey(), height);
-      });
-    }, 500);
+    debug('update cached height');
+    this.setCache('height', this.getFullHeight());
   },
 
-  injectItemsFromCache: function() {
+  injectItemsFromCache() {
     if (!this.el.caching) return;
     debug('injecting items from cache');
 
-    var height = localStorage.getItem(this.getCachedHeightKey());
-    if (height) {
-      this.cachedHeight = height;
-    }
+    var height = this.getCache('height');
+    if (height) this.cachedHeight = height;
 
-    var html = localStorage.getItem(this.getCacheKey());
+    var html = this.getCache('html');
     if (html) {
       this.el.insertAdjacentHTML('beforeend', html);
       this.cacheRendered = true;
@@ -678,6 +820,6 @@ Internal.prototype = {
 module.exports = component.register('gaia-fast-list', GaiaFastListProto);
 
 });})(typeof define=='function'&&define.amd?define
-:(function(n,w){'use strict';return typeof module=='object'?function(c){
+:(function(n,w){return typeof module=='object'?function(c){
 c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
 return w[n];},m.exports,m);w[n]=m.exports;};})('GaiaFastList',this));

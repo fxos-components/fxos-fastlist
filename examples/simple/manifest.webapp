@@ -1,6 +1,6 @@
 {
-  "name": "fast-list/simple",
-  "description": "Sweet",
+  "name": "fast-list/gaia-fast-list/simple",
+  "description": "Faaaaasssst",
   "launch_path": "/index.html",
   "icons": {
     "16": "/icons/icon16x16.png",
@@ -8,6 +8,9 @@
     "60": "/icons/icon60x60.png",
     "128": "/icons/icon128x128.png"
   },
+  "type": "certified",
   "orientation": "default",
-  "permissions": {}
+  "permissions": {
+    "moz-extremely-unstable-and-will-change-webcomponents":{}
+  }
 }
