@@ -6,10 +6,6 @@
 $ bower install gaia-components/gaia-fast-list
 ```
 
-## Examples
-
-- [Example](http://gaia-components.github.io/gaia-fast-list/)
-
 ## Usage
 
 ```html

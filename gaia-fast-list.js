@@ -481,7 +481,9 @@ Internal.prototype = {
    * @return {HTMLElement}
    */
   createSection() {
-    this.parsedSection = this.parsedSection || poplar.parse(this.templateHeader);
+    this.parsedSection = this.parsedSection
+      || poplar.parse(this.templateHeader);
+
     var header = poplar.create(this.parsedSection.cloneNode(true));
 
     var section = document.createElement('section');
