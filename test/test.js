@@ -18,7 +18,7 @@ suite('GaiaFastList >', function() {
 
   teardown(function() {
     this.sinon.restore();
-    // dom.remove();
+    dom.remove();
   });
 
   test('it creates FastList when model is first set', function() {
@@ -81,7 +81,7 @@ suite('GaiaFastList >', function() {
     });
   });
 
-  suite('caching', function() {
+  suite('caching >>', function() {
     setup(function() {
       this.clock = this.sinon.useFakeTimers();
     });
@@ -90,14 +90,13 @@ suite('GaiaFastList >', function() {
       this.el.clearCache();
     });
 
-    test('it should cache the content of the first render', function(done) {
-
+    test('it should cache the content of the first render', function() {
       this.el = createList('caching');
       this.el.model = createModel();
 
       var fastList = this.FastList.lastCall.returnValue;
 
-      fastList.rendered.then(() => {
+      return fastList.rendered.then(() => {
         this.sinon.stub(scheduler, 'mutation');
 
         // Wait for cache to be set
@@ -111,7 +110,96 @@ suite('GaiaFastList >', function() {
         var items = this.el.querySelectorAll('.gfl-item');
 
         assert.ok(items.length, 'items rendered before model set');
-        done();
+      });
+    });
+
+    test('it replaces the cache when the model is first set', function() {
+      this.el = createList('caching');
+
+      // trigger creation of first cache
+      this.el.model = createModel();
+
+      var first = this.el.model[0];
+      var fastList = this.FastList.lastCall.returnValue;
+
+      return fastList.rendered
+        .then(() => {
+
+          // Wait for cache to be set
+          this.sinon.stub(scheduler, 'mutation');
+          this.clock.tick(500);
+          scheduler.mutation.yield();
+          scheduler.mutation.restore();
+
+          // destroy first component
+          this.el.remove();
+
+          // Create new component
+          this.el = createList('caching');
+
+          // wait until rendered
+          var fastList = this.FastList.lastCall.returnValue;
+          return fastList.rendered;
+        })
+
+        .then(() => {
+
+          // assert contains first cached model
+          var firstTitle = this.el.querySelectorAll('.gfl-item h2')[0];
+          assert.equal(firstTitle.textContent, first.title, 'first item matches first model');
+
+          // set a different model
+          this.el.model = createModel().slice(5);
+          first = this.el.model[0];
+
+          // wait until rendered
+          var fastList = this.FastList.lastCall.returnValue;
+          return fastList.rendered;
+        })
+
+        .then(() => {
+
+          // wait for cache to be set
+          this.sinon.stub(scheduler, 'mutation');
+          this.clock.tick(500);
+          scheduler.mutation.yield();
+          scheduler.mutation.restore();
+
+          // destroy second component
+          this.el.remove();
+
+          // create third component
+          this.el = createList('caching');
+
+          // assert contains second cached model
+          var firstTitle = this.el.querySelectorAll('.gfl-item h2')[0];
+          assert.equal(firstTitle.textContent, first.title, 'first item matches first model');
+        });
+    });
+
+    test('it only caches enough list-items to fill the viewport', function() {
+      this.el = createList('caching');
+      this.el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered.then(() => {
+        this.sinon.stub(scheduler, 'mutation');
+
+        // Wait for cache to be set
+        this.clock.tick(500);
+        scheduler.mutation.yield();
+
+        this.el.remove();
+
+        // Create new list
+        this.el = createList('caching');
+        var items = this.el.querySelectorAll('.gfl-item');
+        var itemHeight = 60;
+
+        // We should enough items to fill for the maximum possible
+        // space the list could occupy bearing in mind both orientations
+        var expected = Math.max(window.innerWidth, window.innerHeight) / itemHeight;
+        assert.equal(items.length, Math.ceil(expected));
       });
     });
 
@@ -222,13 +310,13 @@ suite('GaiaFastList >', function() {
 
   suite('styling >>', function() {
     test('it does not put top-borders on the first item in a section', function(done) {
-      var el = createList({ perSection: 10 });
+      var el = createList();
 
       el.configure({
         getSectionName(item) { return item.section; }
       });
 
-      el.model = createModel();
+      el.model = createModel({ perSection: 10 });
       var fastList = this.FastList.lastCall.returnValue;
 
       fastList.rendered.then(() => {
@@ -249,7 +337,7 @@ suite('GaiaFastList >', function() {
     });
 
     test('it does not put border-top on first item when there are no sections', function() {
-      var el = createList({ perSection: 10 });
+      var el = createList();
 
       el.model = createModel();
       var fastList = this.FastList.lastCall.returnValue;
@@ -267,6 +355,18 @@ suite('GaiaFastList >', function() {
           assert.equal(borderTopStyle, expected);
         });
       });
+    });
+
+    test('when created with no cache a placeholder background is displayed', function() {
+      var el = createList();
+      var container = el.shadowRoot.querySelector('.fast-list');
+
+      // In Gecko CSS variables in our linear-gradient
+      // definition returns an empty string (bug 1209066)
+      // so we're checking for background-position instead.
+      var background = getComputedStyle(container).backgroundPosition;
+
+      assert.ok(background, 'background-position defined');
     });
   });
 
@@ -553,7 +653,7 @@ suite('GaiaFastList >', function() {
   function createList(attrs='') {
     attrs += ' style="width:300px;height:400px;"';
 
-    var html = '<gaia-fast-list ' + attrs + '">'
+    var html = '<gaia-fast-list ' + attrs + '>'
       +    '<template>'
       +      '<li>'
       +        '<h2>${title}</h2>'
