@@ -11,30 +11,51 @@ var poplar = require('poplar');
 require('gaia-sub-header');
 
 /**
+ * Pointer abstractions
+ */
+
+var isTouch = 'ontouchstart' in window;
+var touchstart = isTouch ? 'touchstart' : 'mousedown';
+var touchmove = isTouch ? 'touchmove' : 'mousemove';
+var touchend = isTouch ? 'touchend' : 'mouseup';
+
+/**
  * Mini Logger
+ *
+ * @type {Function}
  */
 var debug = 0 ? (...args) => console.log('[GaiaFastList]', ...args) : () => {};
 
 /**
- * Used to hide private poperties behind.
+ * Used to hide private properties behind.
+ *
  * @type {Symbol}
  */
 var internal = Symbol();
 
 /**
  * Public prototype.
+ *
  * @type {Object}
  */
 var GaiaFastListProto = {
   extensible: false,
 
+  /**
+   * Called when the component is first created.
+   *
+   * @private
+   */
   created() {
     debug('create');
     this.setupShadowRoot();
-    this.top = this.getAttribute('top');
-    this.bottom = this.getAttribute('bottom');
+
     this.caching = this.getAttribute('caching');
     this.offset = this.getAttribute('offset');
+    this.picker = this.getAttribute('picker');
+    this.bottom = this.getAttribute('bottom');
+    this.top = this.getAttribute('top');
+
     this[internal] = new Internal(this);
     debug('created');
   },
@@ -47,6 +68,7 @@ var GaiaFastListProto = {
    * if defined.
    *
    * @param  {Object} props
+   * @public
    */
   configure(props) {
     debug('configure');
@@ -82,6 +104,15 @@ var GaiaFastListProto = {
   clearCache() {
     debug('clear cache');
     this[internal].clearCache();
+  },
+
+  /**
+   * Permanently destroy the component.
+   *
+   * @public
+   */
+  destroy() {
+    this[internal].destroy();
   },
 
   /**
@@ -144,7 +175,8 @@ var GaiaFastListProto = {
     scrollTop: {
       get() { return this[internal].fastList.scrollTop; },
       set(value) {
-        if (this[internal].fastList) this[internal].container.scrollTop = value;
+        var fastList = this[internal].fastList;
+        if (fastList) fastList.scrollInstantly(value);
         else this[internal].initialScrollTop = value;
       }
     },
@@ -152,13 +184,29 @@ var GaiaFastListProto = {
     minScrollHeight: {
       get() { return this[internal].list.style.minHeight; },
       set(value) { this[internal].list.style.minHeight = value; }
+    },
+
+    picker: {
+      get() { return this._picker; },
+      set(value) {
+        value = value || value === '';
+        if (value === this._picker) return;
+        if (value) this.setAttr('picker', '');
+        else this.removeAttr('picker');
+        this._picker = value;
+      }
     }
   },
 
+  /*jshint ignore:start*/
   template: `
-    <section class="fast-list">
-      <ul><content></content></ul>
-    </section>
+    <div class="inner">
+      <div class="picker"><content select="[picker-item]"></content></div>
+      <div class="overlay"><div class="text">X</div><div class="icon">search</div></div>
+      <div class="fast-list">
+        <ul><content></content></ul>
+      </div>
+    </div>
 
     <style>
       * { margin: 0; font: inherit; }
@@ -167,18 +215,29 @@ var GaiaFastListProto = {
         display: block;
         height: 100%;
         overflow: hidden;
+        color: var(--text-color);
+      }
+
+      .inner {
+        position: relative;
+
+        height: 100%;
+        overflow: hidden;
+        -moz-user-select: none;
       }
 
       .fast-list {
         position: absolute;
-        left: 0;
-        top: 0;
+        left: 0; right: 0;
+        top: 0; bottom: 0;
 
-        box-sizing: border-box;
-        height: 100%;
-        width: 100%;
         padding: 0 17px;
         overflow: hidden !important;
+      }
+
+      [picker] .fast-list {
+        right: 35px; /* picker width */
+        padding-right: 4px;
       }
 
       .fast-list.layerize {
@@ -203,7 +262,7 @@ var GaiaFastListProto = {
       }
 
       .fast-list.empty:before {
-        content: ''
+        content: "";
         position: sticky;
         top: 0px;
         height: 40px;
@@ -247,7 +306,6 @@ var GaiaFastListProto = {
 
         list-style-type: none;
         color: var(--text-color);
-        -moz-user-select: none;
         text-decoration: none;
         will-change: initial !important;
       }
@@ -299,9 +357,102 @@ var GaiaFastListProto = {
         color: var(--text-color-minus);
         background: var(--background);
       }
-    </style>`,
 
-  FastList: FastList // test hook
+      .picker {
+        display: none;
+      }
+
+      [picker] .picker {
+        position: absolute;
+        right: 0;
+        top: 0;
+
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        width: 35px;
+        height: 100%;
+        padding: 2px 0;
+      }
+
+      ::content [picker-item] {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex: 1;
+        text-decoration: none;
+        text-align: center;
+        color: var(--text-color-minus);
+      }
+
+      ::content [picker-item]:before {
+        font-size: 19px;
+      }
+
+      .picker a {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex: 1;
+
+        text-decoration: none;
+        text-align: center;
+        font-size: 13px;
+        color: var(--text-color-minus);
+        text-transform: uppercase;
+        -moz-user-select: none;
+      }
+
+      .overlay {
+        position: absolute;
+        left: 50%; top: 50%;
+        z-index: 200;
+
+        display: none;
+        width: 1.8em;
+        height: 1.8em;
+        margin: -1em 0 0 -1em;
+        overflow: hidden;
+
+        font-size: 70px;
+        text-align: center;
+        line-height: 1.8;
+        font-weight: 300;
+        border-radius: 50%;
+        background: var(--background-minus);
+        color: #fff;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 400ms;
+        text-transform: uppercase;
+      }
+
+      [picker] .overlay {
+        display: block;
+      }
+
+      .overlay.visible {
+        opacity: 1;
+        transition: opacity 100ms;
+      }
+
+      .overlay > .text {
+
+      }
+
+      .overlay > .icon {
+        position: absolute;
+        left: 0; top: 0; bottom: 0; right: 0;
+        font-family: "gaia-icons";
+        font-weight: 500;
+        text-transform: none;
+        text-rendering: optimizeLegibility;
+      }
+    </style>`,
+  /*jshint ignore:end*/
+
+  // test hooks
+  FastList: FastList
 };
 
 /**
@@ -309,19 +460,52 @@ var GaiaFastListProto = {
  * @param {GaiaFastList} el
  */
 function Internal(el) {
+  var shadow = el.shadowRoot;
+  this.attrs = {};
   this.el = el;
-  this.items = this.injectItemsFromCache();
-  this.container = el.shadowRoot.querySelector('.fast-list');
-  this.list = el.shadowRoot.querySelector('ul');
+
+  this.els = {
+    list: shadow.querySelector('ul'),
+    picker: shadow.querySelector('.picker'),
+    overlay: shadow.querySelector('.overlay'),
+    overlayIcon: shadow.querySelector('.overlay > .icon'),
+    overlayText: shadow.querySelector('.overlay > .text'),
+    container: shadow.querySelector('.fast-list'),
+    listContent: shadow.querySelector('.fast-list content'),
+    items: this.injectItemsFromCache(),
+    pickerItems: []
+  };
+
+  // define property names for FastList
+  this.container = this.els.container;
+  this.items = this.els.items;
+  this.list = this.els.list;
   this.itemContainer = el;
+
   this.configureTemplates();
   this.setEmpty(!this.cacheRendered);
+  this.setupPicker();
+
   debug('internal initialized');
 }
 
 Internal.prototype = {
   headerHeight: 40,
   itemHeight: 60,
+
+  /**
+   * Teardown `Picker` and `FastList`.
+   *
+   * @private
+   */
+  destroy() {
+    debug('detached');
+    this.teardownPicker();
+    if (this.fastList) {
+      this.fastList.destroy();
+      delete this.fastList;
+    }
+  },
 
   /**
    * Setting the model for the first
@@ -340,6 +524,68 @@ Internal.prototype = {
     if (!this.fastList) this.createList();
     else this.fastList.reloadData();
     this.setEmpty(false);
+  },
+
+  setupPicker() {
+    if (!this.el.picker) return;
+
+    this.picker = new Picker(this.els.picker);
+    this.onPickingStarted = this.onPickingStarted.bind(this);
+    this.onPickingEnded = this.onPickingEnded.bind(this);
+    this.onPicked = this.onPicked.bind(this);
+
+    this.picker.addEventListener('started', this.onPickingStarted);
+    this.picker.addEventListener('ended', this.onPickingEnded);
+    this.picker.addEventListener('picked', this.onPicked);
+    debug('picker setup');
+  },
+
+  teardownPicker() {
+    if (!this.picker) return;
+
+    this.picker.removeEventListener('picked', this.onPicked);
+    this.picker.destroy();
+
+    delete this.onPicked;
+    delete this.onPickingEnded;
+    delete this.onPickingStarted;
+    delete this.picker;
+
+    debug('picker torndown');
+  },
+
+  onPicked() {
+    debug('on picked');
+    var link = this.picker.selected;
+    this.setOverlayContent(link.dataset.icon, link.textContent);
+  },
+
+  onPickingStarted() {
+    this.els.overlay.classList.add('visible');
+  },
+
+  onPickingEnded() {
+    debug('on picking ended');
+    var link = this.picker.selected;
+    var id = link.hash.substr(1);
+
+    this.jumpToId(id);
+    this.els.overlay.classList.remove('visible');
+  },
+
+  setOverlayContent(icon, text) {
+    var letterNode = this.els.overlayText;
+    var iconNode = this.els.overlayIcon;
+
+    if (icon) {
+      iconNode.firstChild.data = icon;
+      letterNode.style.visibility = 'hidden';
+      iconNode.style.visibility = 'visible';
+    } else {
+      letterNode.firstChild.data = text;
+      iconNode.style.visibility = 'hidden';
+      letterNode.style.visibility = 'visible';
+    }
   },
 
   /**
@@ -480,7 +726,7 @@ Internal.prototype = {
    *
    * @return {HTMLElement}
    */
-  createSection() {
+  createSection(name) {
     this.parsedSection = this.parsedSection
       || poplar.parse(this.templateHeader);
 
@@ -494,6 +740,7 @@ Internal.prototype = {
     section.appendChild(header);
     section.appendChild(background);
     section.classList.add('gfl-section');
+    section.id = `gfl-section-${name}`;
 
     return section;
   },
@@ -672,6 +919,47 @@ Internal.prototype = {
     return top;
   },
 
+  /**
+   * Jump scroll position to th top of a section.
+   *
+   * If a section of the given name is not
+   * found the scroll postion will not
+   * be changed.
+   *
+   * @param  {String} name
+   * @private
+   */
+  jumpToId(id) {
+    debug('jump to id', id);
+    if (!id) return;
+
+    var children = this.els.listContent.getDistributedNodes();
+    var found = false;
+    var offset = 0;
+
+    for (var i = 0, l = children.length; i < l; i++) {
+      var child = children[i];
+
+      // Skip text-nodes
+      if (!child.tagName) continue;
+
+      if (child.id === id) {
+        debug('found section', child);
+        found = true;
+        break;
+      }
+
+      // skip <style> and gfl-items
+      if (child.tagName == 'STYLE') continue;
+      if (child.classList.contains('.gfl-item')) continue;
+
+      var height = child.style.height || child.offsetHeight;
+      offset += parseInt(height);
+    }
+
+    if (found) this.el.scrollTop = offset;
+  },
+
   getFullLength() {
     return this.model.length;
   },
@@ -813,6 +1101,115 @@ Internal.prototype = {
   // <template item> inside <gaia-fast-list>
   templateItem: '<a href="${link}"><div class="text"><h3>${title}</h3>' +
     '<p>${body}</p></div><div class="image"><img src="${image}"/></div></a>'
+};
+
+function Picker(el) {
+  this.el = el;
+  this.els = {
+    content: this.el.querySelector('content'),
+    items: []
+  };
+
+  // bind so we can removeEventListener
+  this.onTouchStart = this.onTouchStart.bind(this);
+  this.onTouchMove = this.onTouchMove.bind(this);
+  this.onTouchEnd = this.onTouchEnd.bind(this);
+  this.onClick = this.onClick.bind(this);
+
+  this.el.addEventListener(touchstart, this.onTouchStart);
+  this.el.addEventListener('click', this.onClick, true);
+
+  this.render();
+  debug('created picker');
+}
+
+Picker.prototype = {
+  render() {
+    var letters = 'abcdefghijklmnopqrstuvwxyz#';
+    var length = letters.length;
+
+    for (var i = 0; i < length; i++) {
+      var letter = letters[i];
+      var el = document.createElement('a');
+      el.textContent = letters[i];
+      el.href = `#gfl-section-${letter}`;
+      this.el.appendChild(el);
+      this.els.items.push(el);
+    }
+  },
+
+  addEventListener(name, fn) { this.el.addEventListener(name, fn); },
+  removeEventListener(name, fn) { this.el.removeEventListener(name, fn); },
+
+  onTouchStart(e) {
+    debug('touch start');
+    this.height = this.el.clientHeight;
+    this.els.allItems = this.getAllItems();
+    this.itemHeight = this.height / this.els.allItems.length;
+    this.offset = this.el.getBoundingClientRect().top;
+
+    scheduler.attachDirect(window, touchmove, this.onTouchMove);
+    addEventListener(touchend, this.onTouchEnd);
+
+    this.update(e);
+    this.emit('started');
+  },
+
+  onTouchMove(e) {
+    debug('touch move');
+    var fast = (e.timeStamp - this.lastUpdate) < 50;
+    if (!fast) this.update(e);
+  },
+
+  onTouchEnd(e) {
+    debug('touch end');
+
+    scheduler.detachDirect(window, touchmove, this.onTouchMove);
+    removeEventListener(touchend, this.onTouchEnd);
+
+    this.update(e);
+    this.emit('ended');
+  },
+
+  onClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  },
+
+  update(e) {
+    debug('update', this.selectedIndex);
+    var allItems = this.els.allItems;
+    var pageY = e.pageY || e.changedTouches[0].pageY;
+    var y = pageY - this.offset;
+    var index = Math.floor(y / this.itemHeight);
+
+    // clamp within index range
+    index = Math.max(0, Math.min(allItems.length - 1, index));
+
+    // abort if new index is same as current
+    if (index === this.selectedIndex) return;
+
+    this.selectedIndex = index;
+    this.selected = allItems[index];
+    this.lastUpdate = e.timeStamp;
+    this.emit('picked');
+  },
+
+  getAllItems() {
+    var light = [].slice.call(this.els.content.getDistributedNodes());
+    var shadow = this.els.items;
+    return light.concat(shadow);
+  },
+
+  emit(name) {
+    this.el.dispatchEvent(new CustomEvent(name, { bubbles: false }));
+  },
+
+  destroy() {
+    this.els.items.forEach(el => el.remove());
+    this.el.removeEventListener(touchstart, this.onTouchStart);
+    this.el.removeEventListener('click', this.onClick, true);
+  }
 };
 
 /**
