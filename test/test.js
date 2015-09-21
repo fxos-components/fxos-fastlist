@@ -6,6 +6,7 @@ test, assert, scheduler, GaiaFastList */
 suite('GaiaFastList >', function() {
   'use strict';
   var GaiaFastListProto = GaiaFastList.prototype;
+  var utils = window['test-utils'];
   var dom;
 
   setup(function() {
@@ -269,7 +270,6 @@ suite('GaiaFastList >', function() {
     });
   });
 
-
   suite('reflows', function() {
     var clientHeight;
     var offsetHeight;
@@ -322,6 +322,121 @@ suite('GaiaFastList >', function() {
     });
   });
 
+  suite('picker', function() {
+    var el;
+
+    setup(function() {
+      this.sinon.stub(window, 'requestAnimationFrame').callsArg(0); // sync raf
+      this.clock = this.sinon.useFakeTimers();
+    });
+
+    teardown(function() {
+      el.destroy();
+    });
+
+    test('it jumps to a section when tapped', function() {
+      el = createList('picker');
+      var picker = el.shadowRoot.querySelector('.picker');
+
+      el.configure({ getSectionName(item) { return item.section; } });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          var x = picker.clientWidth / 2;
+          var sectionB = el.querySelector('#gfl-section-b');
+
+          utils.touch(picker, 'touchstart', x, 20);
+          utils.touch(picker, 'touchend', x, 20);
+
+          assert.equal(sectionB.offsetTop, el.scrollTop);
+        });
+    });
+
+    test('the picker overlay displays the letter of the pressed picker-item', function() {
+      el = createList('picker');
+      var picker = el.shadowRoot.querySelector('.picker');
+      var overlayText = el.shadowRoot.querySelector('.overlay > .text');
+
+      el.configure({ getSectionName(item) { return item.section; } });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          var x = picker.clientWidth / 2;
+          var pickerItemHeight = picker.querySelector('a').offsetHeight;
+          var y = 6;
+
+          utils.touch(picker, 'touchstart', x, y);
+          assert.equal(overlayText.textContent, 'a');
+
+          this.clock.tick(50);
+          utils.touch(picker, 'touchmove', x, y += pickerItemHeight);
+          assert.equal(overlayText.textContent, 'b');
+
+          this.clock.tick(50);
+          utils.touch(picker, 'touchmove', x, y += pickerItemHeight);
+          assert.equal(overlayText.textContent, 'c');
+
+          this.clock.tick(50);
+          utils.touch(picker, 'touchmove', x, y += pickerItemHeight);
+          assert.equal(overlayText.textContent, 'd');
+
+          utils.touch(picker, 'touchend', x, y);
+        });
+    });
+
+    test('it accepts user provided picker items', function() {
+      el = createList('picker');
+
+      var customPickerItem = document.createElement('a');
+      customPickerItem.setAttribute('picker-item', '');
+      customPickerItem.textContent = '1';
+
+      // href used to define scroll target
+      customPickerItem.href = '#gfl-section-d';
+      el.appendChild(customPickerItem);
+
+      el.configure({ getSectionName(item) { return item.section; } });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          var sectionD = el.querySelector('#gfl-section-d');
+
+          utils.touch(customPickerItem, 'touchstart');
+          utils.touch(customPickerItem, 'touchend');
+
+          assert.equal(sectionD.offsetTop, el.scrollTop);
+        });
+    });
+
+    test('it populates overlay icon if picker-item is an icon', function() {
+      el = createList('picker');
+      var overlayIcon = el.shadowRoot.querySelector('.overlay > .icon');
+
+      var customPickerItem = document.createElement('a');
+      customPickerItem.setAttribute('picker-item', '');
+      customPickerItem.setAttribute('data-icon', 'icon-id');
+      el.appendChild(customPickerItem);
+
+      el.configure({ getSectionName(item) { return item.section; } });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          utils.touch(customPickerItem, 'touchstart');
+          utils.touch(customPickerItem, 'touchend');
+
+          assert.equal(overlayIcon.textContent, 'icon-id');
+        });
+    });
+  });
+
   /**
    * Utils
    */
@@ -343,16 +458,25 @@ suite('GaiaFastList >', function() {
   }
 
   function createModel(params) {
-    var length = params && params.length || 100;
     var perSection = params && params.perSection || 10;
+    var maxLength = params && params.length;
+    var letters = 'abcdefghijklmnopqrstuvwyz';
     var result = [];
+    var count = 0;
 
-    for (var i = 0; i < length; i++) {
-      result.push({
-        title: `Title ${i}`,
-        body: `Body ${i}`,
-        section: `Section ${Math.floor(i / perSection)}`
-      });
+    for (var i = 0; i < letters.length; i++) {
+      for (var j = 0; j < perSection; j++) {
+        if (maxLength && count >= maxLength) break;
+
+        result.push({
+          title: `Title ${j}`,
+          body: `Body ${j}`,
+          section: letters[i]
+        });
+
+        count++;
+      }
+
     }
 
     return result;

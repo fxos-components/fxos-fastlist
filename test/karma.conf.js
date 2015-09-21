@@ -15,6 +15,8 @@ module.exports = function(config) {
       'bower_components/gaia-component/gaia-component.js',
       'bower_components/poplar/poplar.js',
       'gaia-fast-list.js',
+      'bower_components/test-utils/src/utils.js',
+      'test/test.css',
       'test/test.js'
     ],
 
@@ -35,7 +37,10 @@ module.exports = function(config) {
     customLaunchers: {
       firefox_latest: {
         base: 'FirefoxNightly',
-        prefs: { 'dom.webcomponents.enabled': true }
+        prefs: {
+          'dom.webcomponents.enabled': true,
+          'dom.w3c_touch_events.enabled': 1
+        }
       }
     },
 
