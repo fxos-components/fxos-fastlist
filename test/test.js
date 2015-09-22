@@ -18,7 +18,7 @@ suite('GaiaFastList >', function() {
 
   teardown(function() {
     this.sinon.restore();
-    dom.remove();
+    // dom.remove();
   });
 
   test('it creates FastList when model is first set', function() {
@@ -437,6 +437,115 @@ suite('GaiaFastList >', function() {
     });
   });
 
+  suite('images', function() {
+    var el;
+
+    test('it loads images', function() {
+      el = createList();
+      el.configure({
+        getItemImageSrc(item, i) {
+          return `/base/test/lib/artwork-${i % 10}.jpg`;
+        }
+      });
+
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          return Promise.all([].map.call(el.querySelectorAll('img'), img => {
+            return new Promise(resolve => img.addEventListener('load', resolve));
+          }));
+        });
+    });
+
+    test('it loads correct images when the scrollTop changes', function() {
+      el = createList();
+      el.configure({
+        getItemImageSrc(item, i) {
+          return `/base/test/lib/artwork-${i % 10}.jpg`;
+        }
+      });
+
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          var itemHeight = 60;
+          el.scrollTop = 55 * itemHeight;
+
+          // wait one tick for re-render
+          return Promise.resolve();
+        })
+        .then(() => {
+          var items = el.querySelectorAll('.gfl-item');
+          [].forEach.call(items, item => {
+            var index = item.dataset.index;
+            var expected = `/base/test/lib/artwork-${index % 10}.jpg`;
+            var img = item.querySelector('img');
+            assert.include(img.src, expected);
+          });
+        });
+    });
+
+    test('it keeps the image hidden if no src is returned', function() {
+      el = createList();
+      el.configure({
+        getItemImageSrc(item, i) {
+          return i % 3
+            ? `/base/test/lib/artwork-${i % 10}.jpg`
+            : undefined;
+        }
+      });
+
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          var items = el.querySelectorAll('.gfl-item');
+          return [].map.call(items, item => {
+            var img = item.querySelector('img');
+            var index = item.dataset.index;
+
+            if (index % 3 === 0) {
+              assert.equal(img.src, '', 'no src set');
+              assert.equal(img.onload, null, 'no load handler set');
+              assert.equal(getComputedStyle(img).opacity, '0', 'hidden');
+            }
+          });
+        });
+    });
+
+    test('getImageSrc() can return a Promise', function() {
+      el = createList();
+      el.configure({
+        getItemImageSrc(item, i) {
+          return new Promise(resolve => {
+            setTimeout(() => {
+              resolve(`/base/test/lib/artwork-${i % 10}.jpg`);
+            });
+          });
+        }
+      });
+
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          return Promise.all([].map.call(el.querySelectorAll('img'), (img, index) => {
+            return new Promise(resolve => img.addEventListener('load', e => {
+              var expected = `/base/test/lib/artwork-${index % 10}.jpg`;
+              assert.include(img.src, expected);
+              resolve();
+            }));
+          }));
+        });
+    });
+  });
+
   /**
    * Utils
    */
@@ -449,6 +558,7 @@ suite('GaiaFastList >', function() {
       +      '<li>'
       +        '<h2>${title}</h2>'
       +        '<p>${body}</p>'
+      +        '<div class="image"><img/></div>'
       +      '</li>'
       +    '</template>'
       + '</gaia-fast-list>';

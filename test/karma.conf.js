@@ -16,6 +16,7 @@ module.exports = function(config) {
       'bower_components/poplar/poplar.js',
       'gaia-fast-list.js',
       'bower_components/test-utils/src/utils.js',
+      { pattern: 'test/lib/*.jpg', included: false },
       'test/test.css',
       'test/test.js'
     ],

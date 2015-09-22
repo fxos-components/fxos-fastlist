@@ -31,7 +31,10 @@ var debug = 0 ? (...args) => console.log('[GaiaFastList]', ...args) : () => {};
  *
  * @type {Symbol}
  */
-var internal = Symbol();
+var keys = {
+  internal: Symbol(),
+  img: Symbol()
+};
 
 /**
  * Public prototype.
@@ -56,7 +59,7 @@ var GaiaFastListProto = {
     this.bottom = this.getAttribute('bottom');
     this.top = this.getAttribute('top');
 
-    this[internal] = new Internal(this);
+    this[keys.internal] = new Internal(this);
     debug('created');
   },
 
@@ -72,7 +75,7 @@ var GaiaFastListProto = {
    */
   configure(props) {
     debug('configure');
-    this[internal].configure(props);
+    this[keys.internal].configure(props);
   },
 
   /**
@@ -92,8 +95,8 @@ var GaiaFastListProto = {
   complete() {
     if (!this.caching) return;
     debug('complete');
-    this[internal].cachedHeight = null;
-    this[internal].updateCachedHeight();
+    this[keys.internal].cachedHeight = null;
+    this[keys.internal].updateCachedHeight();
   },
 
   /**
@@ -103,7 +106,7 @@ var GaiaFastListProto = {
    */
   clearCache() {
     debug('clear cache');
-    this[internal].clearCache();
+    this[keys.internal].clearCache();
   },
 
   /**
@@ -112,7 +115,7 @@ var GaiaFastListProto = {
    * @public
    */
   destroy() {
-    this[internal].destroy();
+    this[keys.internal].destroy();
   },
 
   /**
@@ -123,8 +126,8 @@ var GaiaFastListProto = {
    */
   attrs: {
     model: {
-      get() { return this[internal].model; },
-      set(value) { this[internal].setModel(value); }
+      get() { return this[keys.internal].model; },
+      set(value) { this[keys.internal].setModel(value); }
     },
 
     top: {
@@ -173,17 +176,17 @@ var GaiaFastListProto = {
     },
 
     scrollTop: {
-      get() { return this[internal].fastList.scrollTop; },
+      get() { return this[keys.internal].fastList.scrollTop; },
       set(value) {
-        var fastList = this[internal].fastList;
+        var fastList = this[keys.internal].fastList;
         if (fastList) fastList.scrollInstantly(value);
-        else this[internal].initialScrollTop = value;
+        else this[keys.internal].initialScrollTop = value;
       }
     },
 
     minScrollHeight: {
-      get() { return this[internal].list.style.minHeight; },
-      set(value) { this[internal].list.style.minHeight = value; }
+      get() { return this[keys.internal].list.style.minHeight; },
+      set(value) { this[keys.internal].list.style.minHeight = value; }
     },
 
     picker: {
@@ -214,16 +217,12 @@ var GaiaFastListProto = {
       :host {
         display: block;
         height: 100%;
-        overflow: hidden;
-        color: var(--text-color);
+
+        color: var(--text-color-minus);
       }
 
       .inner {
-        position: relative;
-
         height: 100%;
-        overflow: hidden;
-        -moz-user-select: none;
       }
 
       .fast-list {
@@ -245,12 +244,7 @@ var GaiaFastListProto = {
       }
 
       .fast-list.empty {
-        background: repeating-linear-gradient(
-          0deg,
-          var(--background) 0px,
-          var(--background) 59px,
-          var(--border-color) 60px,
-          var(--border-color) 60px);
+
         background-position: 0 1px;
       }
 
@@ -269,9 +263,6 @@ var GaiaFastListProto = {
         z-index: 100;
 
         display: block;
-
-        background: var(--background-plus);
-        color: var(--title-color);
       }
 
       ::content .gfl-section {
@@ -297,15 +288,15 @@ var GaiaFastListProto = {
       ::content .gfl-item {
         z-index: 10;
 
-        box-sizing: border-box;
         display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
         width: 100%;
         height: 60px;
-        padding: 9px 0;
-        align-items: center;
+        padding: 0 9px;
 
         list-style-type: none;
-        color: var(--text-color);
         text-decoration: none;
         will-change: initial !important;
       }
@@ -314,48 +305,67 @@ var GaiaFastListProto = {
         will-change: transform !important;
       }
 
-      ::content .gfl-item .text {
-        flex: 1;
-        min-width: 0;
-      }
-
       ::content .gfl-item .image {
+        position: absolute;
+        right: 0; top: 0;
+
         width: 60px;
         height: 60px;
-        background: var(--border-color);
-        -moz-margin-start: 17px;
+
+        background-color: var(--border-color);
+      }
+
+      ::content .image.round,
+      ::content .image.round > img {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
       }
 
       ::content .gfl-item .image.round {
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        overflow: hidden;
+        top: 8.5px;
       }
 
-      ::content .gfl-item .image > img {
-        width: 100%;
-        height: 100%;
+      ::content .gfl-item img {
+        position: absolute;
+        left: 0; top: 0;
+
+        width: 60px;
+        height: 60px;
+
+        opacity: 0;
+        will-change: opacity;
+      }
+
+      ::content h3,
+      ::content p {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      ::content .image ~ h3,
+      ::content .image ~ p {
+        padding-right: 60px;
+      }
+
+      ::content .image.round ~ h3,
+      ::content .image.round ~ p {
+        padding-right: 42px;
       }
 
       ::content h3 {
         margin: 0;
-        overflow: hidden;
 
         font-size: 20px;
         font-weight: 400;
-        white-space: nowrap;
-        text-overflow: ellipsis;
         color: var(--text-color);
-        background: var(--background);
       }
 
       ::content p {
         margin: 0;
         font-size: 15px;
         line-height: 1.35em;
-        color: var(--text-color-minus);
-        background: var(--background);
       }
 
       .picker {
@@ -382,7 +392,7 @@ var GaiaFastListProto = {
         flex: 1;
         text-decoration: none;
         text-align: center;
-        color: var(--text-color-minus);
+        color: inherit;
       }
 
       ::content [picker-item]:before {
@@ -398,7 +408,8 @@ var GaiaFastListProto = {
         text-decoration: none;
         text-align: center;
         font-size: 13px;
-        color: var(--text-color-minus);
+        color: inherit;
+
         text-transform: uppercase;
         -moz-user-select: none;
       }
@@ -412,15 +423,15 @@ var GaiaFastListProto = {
         width: 1.8em;
         height: 1.8em;
         margin: -1em 0 0 -1em;
-        overflow: hidden;
 
         font-size: 70px;
         text-align: center;
         line-height: 1.8;
         font-weight: 300;
         border-radius: 50%;
-        background: var(--background-minus);
+
         color: #fff;
+        background: var(--background-minus);
         pointer-events: none;
         opacity: 0;
         transition: opacity 400ms;
@@ -434,10 +445,6 @@ var GaiaFastListProto = {
       .overlay.visible {
         opacity: 1;
         transition: opacity 100ms;
-      }
-
-      .overlay > .text {
-
       }
 
       .overlay > .icon {
@@ -610,6 +617,8 @@ Internal.prototype = {
     var sectioned = !!this.getSectionName;
     var hash = {};
 
+    this.hasSections = false;
+
     for (var i = 0, l = items.length; i < l; i++) {
       var item = items[i];
       var section = sectioned && this.getSectionName(item);
@@ -637,6 +646,7 @@ Internal.prototype = {
       }
 
       hash[section].push(item);
+      this.hasSections = true;
     }
 
     return sectioned && hash;
@@ -716,6 +726,7 @@ Internal.prototype = {
     debug('create item');
     this.parsedItem = this.parsedItem || poplar.parse(this.templateItem);
     var el = poplar.create(this.parsedItem.cloneNode(true));
+    el[keys.img] = el.querySelector('img');
     el.classList.add('gfl-item');
     return el;
   },
@@ -772,6 +783,41 @@ Internal.prototype = {
       : '0';
   },
 
+  populateItemDetail(el, i) {
+    if (!this.getItemImageSrc) return;
+
+    var img = el[keys.img];
+    if (!img) return;
+
+    var record = this.getRecordAt(i);
+    Promise.resolve(this.getItemImageSrc(record, i))
+      .then(src => {
+
+        // There is a chance that the item
+        // could have been recycled before
+        // the user was able to fetch the image.
+        // Abort here if that's the case.
+        if (el.dataset.index != i) return debug('item recycled');
+
+        // Abort if no src is returned
+        if (!src) return;
+
+        img.src = src;
+        img.onload = () => {
+          img.style.transition = 'opacity 250ms';
+          img.style.opacity = 1;
+        };
+      });
+  },
+
+  unpopulateItemDetail(el, i) {
+    if (!this.getItemImageSrc) return;
+    var img = el[keys.img];
+    if (!img) return;
+    img.style.transition = 'none';
+    img.style.opacity = 0;
+  },
+
   /**
    * Called by FastList when it needs
    * to populate a section with content.
@@ -813,12 +859,8 @@ Internal.prototype = {
     return Object.keys(this.sections || {});
   },
 
-  hasSections() {
-    return !!this.getSections().length;
-  },
-
   getSectionHeaderHeight() {
-    return this.hasSections() ? this.headerHeight : 0;
+    return this.hasSections ? this.headerHeight : 0;
   },
 
   getFullSectionHeight(key) {
@@ -899,20 +941,21 @@ Internal.prototype = {
     // debug('get position for index', index);
     var sections = this.sections || [this.model];
     var headerHeight = this.getSectionHeaderHeight();
-    var itemHeight = this.getItemHeight();
+    var itemHeight = this.itemHeight;
     var top = this.el.offset;
+    var length;
 
     for (var name in sections) {
-      var items = sections[name];
+      length = sections[name].length;
       top += headerHeight;
 
-      if (index < items.length) {
+      if (index < length) {
         top += index * itemHeight;
         break;
       }
 
-      index -= items.length;
-      top += items.length * itemHeight;
+      index -= length;
+      top += length * itemHeight;
     }
 
     // debug('got position', top);
