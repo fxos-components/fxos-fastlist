@@ -910,8 +910,6 @@ Internal.prototype = {
     var fullLength = this.getFullLength();
     var index = 0;
 
-    pos += this.el.offset;
-
     for (var name in sections) {
       var items = sections[name];
       var sectionHeight = items.length * itemHeight;
