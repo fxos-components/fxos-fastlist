@@ -10,7 +10,7 @@ list.model = getData();
 function getData() {
   var result = [];
 
-  var letters = 'abcdefghijklmnopqrstuvwyz';
+  var letters = 'abcdefghijklmnopqrstuvwyz#';
   var length = letters.length;
 
   for (var i = 0; i < length; i++) {

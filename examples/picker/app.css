@@ -10,3 +10,17 @@ body {
   height: 100%;
   overflow: hidden;
 }
+
+header {
+  height: 50px;
+  background: var(--highlight-color);
+}
+
+gaia-fast-list {
+  position: absolute;
+  left: 0;
+  top: 50px;
+  right: 0;
+  bottom: 0;
+  height: auto !important;
+}
