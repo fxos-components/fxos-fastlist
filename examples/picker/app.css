@@ -9,6 +9,17 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+
+  background: var(--background);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+gaia-theme-selector {
+  position: relative !important;
 }
 
 header {
@@ -17,10 +28,5 @@ header {
 }
 
 gaia-fast-list {
-  position: absolute;
-  left: 0;
-  top: 50px;
-  right: 0;
-  bottom: 0;
-  height: auto !important;
+  flex: 1;
 }

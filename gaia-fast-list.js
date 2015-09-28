@@ -238,8 +238,8 @@ var GaiaFastListProto = {
       }
 
       [picker] .fast-list {
-        right: 26px; /* picker width */
-        padding-right: 12px;
+        offset-inline-end: 26px; /* picker width */
+        padding-inline-end: 12px;
       }
 
       .fast-list.layerize {
@@ -331,9 +331,10 @@ var GaiaFastListProto = {
         will-change: transform !important;
       }
 
-      ::content .gfl-item .image {
+      ::content .image {
         position: absolute;
-        right: 0; top: 0;
+        top: 0;
+        offset-inline-end: 0;
 
         width: 60px;
         height: 60px;
@@ -372,12 +373,12 @@ var GaiaFastListProto = {
 
       ::content .image ~ h3,
       ::content .image ~ p {
-        padding-right: 60px;
+        padding-inline-end: 60px;
       }
 
       ::content .image.round ~ h3,
       ::content .image.round ~ p {
-        padding-right: 42px;
+        padding-inline-end: 42px;
       }
 
       ::content h3 {
@@ -400,7 +401,7 @@ var GaiaFastListProto = {
 
       [picker] .picker {
         position: absolute;
-        right: 0;
+        offset-inline-end: 0;
         top: 0;
 
         box-sizing: border-box;
