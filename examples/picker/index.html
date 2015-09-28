@@ -9,16 +9,20 @@
     <link rel="stylesheet" href="bower_components/gaia-icons/gaia-icons.css">
     <link rel="stylesheet" href="app.css">
 
+    <script defer src="bower_components/font-fit/font-fit.js"></script>
     <script defer src="bower_components/dom-scheduler/lib/dom-scheduler.js"></script>
     <script defer src="bower_components/gaia-component/gaia-component.js"></script>
+    <script defer src="bower_components/gaia-header/gaia-header.js"></script>
     <script defer src="bower_components/gaia-sub-header/gaia-sub-header.js"></script>
+    <script defer src="bower_components/gaia-theme/lib/gaia-theme-selector.js"></script>
     <script defer src="bower_components/poplar/poplar.js"></script>
     <script defer src="bower_components/fast-list/fast-list.js"></script>
     <script defer src="gaia-fast-list.js"></script>
     <script defer src="app.js"></script>
   </head>
   <body class="theme-communications">
-    <header>Header</header>
+    <gaia-theme-selector></gaia-theme-selector>
+    <gaia-header><h1>Header</h1></gaia-header>
     <gaia-fast-list top="0" bottom="0" offset="50" picker>
       <div id="search-bar" style="height:50px">Search</div>
       <a picker-item data-icon="search" href="#search-bar" data-l10n-id></a>
@@ -26,11 +30,9 @@
 
       <template>
         <li>
-          <div class="text">
-            <h3>${title}</h3>
-            <p>${body}</p>
-          </div>
           <div class="image round"></div>
+          <h3>${title}</h3>
+          <p>${body}</p>
         </li>
       </template>
     </gaia-fast-list>
