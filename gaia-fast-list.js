@@ -423,6 +423,10 @@ var GaiaFastListProto = {
         color: inherit;
       }
 
+      ::content [picker-item][data-icon] {
+        font-size: 0; /* hide icon text-label */
+      }
+
       ::content [picker-item]:before {
         font-size: 19px;
         -moz-user-select: none;
