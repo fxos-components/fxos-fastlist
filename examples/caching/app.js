@@ -21,7 +21,7 @@ function loadNext() {
 
     count += chunkSize;
     if (count >= total) {
-      list.complete();
+      list.cache();
     }
 
     if (count < total) {

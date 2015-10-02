@@ -6,7 +6,10 @@ module.exports = function(config) {
 
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-    frameworks: ['mocha', 'sinon-chai'],
+    frameworks: [
+      'mocha',
+      'sinon-chai'
+    ],
 
     // list of files / patterns to load in the browser
     files: [
@@ -16,6 +19,7 @@ module.exports = function(config) {
       'bower_components/poplar/poplar.js',
       'gaia-fast-list.js',
       'bower_components/test-utils/src/utils.js',
+      'bower_components/gaia-theme/gaia-theme.css',
       { pattern: 'test/lib/*.jpg', included: false },
       'test/test.css',
       'test/test.js'
