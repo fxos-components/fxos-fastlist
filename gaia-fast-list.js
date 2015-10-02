@@ -47,6 +47,22 @@ var GaiaFastListProto = {
   extensible: false,
 
   /**
+   * Default store up to 5mb of images.
+   *
+   * @type {Number}
+   */
+  imageCacheSize: 5e6,
+
+  /**
+   * Default store up to 500 images
+   * before entries start getting
+   * discarded.
+   *
+   * @type {Number}
+   */
+  imageCacheLength: 500,
+
+  /**
    * Called when the component is first created.
    *
    * @private
@@ -501,8 +517,13 @@ var GaiaFastListProto = {
  */
 function Internal(el) {
   var shadow = el.shadowRoot;
-  this.attrs = {};
+
   this.el = el;
+  this.images = {
+    list: [],
+    hash: {},
+    bytes: 0
+  };
 
   this.els = {
     list: shadow.querySelector('ul'),
@@ -515,16 +536,18 @@ function Internal(el) {
     pickerItems: []
   };
 
-  this.injectItemsFromCache();
-
   // define property names for FastList
   this.container = this.els.container;
   this.list = this.els.list;
   this.itemContainer = el;
 
+  this.injectItemsFromCache();
   this.configureTemplates();
   this.setEmpty(!this.els.cached);
   this.setupPicker();
+
+  // don't memory leak ObjectURLs
+  addEventListener('pagehide', () => this.emptyImageCache());
 
   debug('internal initialized');
 }
@@ -534,7 +557,7 @@ Internal.prototype = {
   itemHeight: 60,
 
   /**
-   * Teardown `Picker` and `FastList`.
+   * Permanently destroy the list.
    *
    * @private
    */
@@ -562,8 +585,23 @@ Internal.prototype = {
     this.model = model;
     this.sections = this.sectionize(model);
     if (!this.fastList) this.createList();
-    else this.fastList.reloadData();
+    else this.reloadData();
     this.setEmpty(false);
+  },
+
+  /**
+   * Reloading the list will completely
+   * re-render the list.
+   *
+   * We must empty the image cache as data
+   * may have changed or item indexed
+   * may not longer map to new model.
+   *
+   * @private
+   */
+  reloadData() {
+    this.emptyImageCache();
+    this.fastList.reloadData();
   },
 
   setupPicker() {
@@ -613,6 +651,16 @@ Internal.prototype = {
     this.els.overlay.classList.remove('visible');
   },
 
+  /**
+   * Set the picker overlay content
+   * prefering icons over text.
+   *
+   * The manipulation is done is such
+   * a way that prevents reflow.
+   *
+   * @param {String} icon
+   * @param {String} text
+   */
   setOverlayContent(icon, text) {
     var letterNode = this.els.overlayText;
     var iconNode = this.els.overlayIcon;
@@ -717,6 +765,12 @@ Internal.prototype = {
     this.container.classList.add('layerize');
   },
 
+  /**
+   * Mixin properties/methods into the
+   * 'data-source' object passed to FastList.
+   *
+   * @param  {Object} props
+   */
   configure(props) {
     Object.assign(this, props);
   },
@@ -826,6 +880,7 @@ Internal.prototype = {
    *
    * @param  {HTMLElement} el  list-item node
    * @param  {Number} i  index
+   * @private
    */
   populateItemDetail(el, i) {
     if (!this.getItemImageSrc) return;
@@ -834,24 +889,50 @@ Internal.prototype = {
     if (!img) return;
 
     var record = this.getRecordAt(i);
-    Promise.resolve(this.getItemImageSrc(record, i))
-      .then(src => {
+    var cached = this.getCachedImage(i);
 
-        // There is a chance that the item
-        // could have been recycled before
-        // the user was able to fetch the image.
-        // Abort here if that's the case.
+    // if we have the image cached
+    // we can just load it sync
+    if (cached) {
+      load(cached);
+      return;
+    }
+
+    // if we don't have the image we
+    // run the user's getter function
+    Promise.resolve(this.getItemImageSrc(record, i))
+      .then(result => {
+        if (!result) return;
+
+        // There is a chance that the item could have
+        // been recycled before the user was able to
+        // fetch the image. Abort here if that's the case.
         if (el.dataset.index != i) return debug('item recycled');
 
-        // Abort if no src is returned
-        if (!src) return;
+        var image = {
+          src: normalizeImageSrc(result),
+          bytes: result.size || result.length
+        };
 
-        img.src = src;
-        img.onload = () => {
+        this.cacheImage(image, i);
+        load(image);
+      }).catch(e => { throw e; });
+
+    /**
+     * Loads
+     * @param  {[type]} image [description]
+     * @return {[type]}       [description]
+     */
+    function load(image) {
+      debug('load image', image);
+      img.src = image.src;
+      img.onload = () => {
+        requestAnimationFrame(() => {
           img.style.transition = 'opacity 250ms';
           img.style.opacity = 1;
-        };
-      });
+        });
+      };
+    }
   },
 
   /**
@@ -860,6 +941,7 @@ Internal.prototype = {
    *
    * @param  {HTMLElement} el  list-item
    * @param  {Number} i  index
+   * @private
    */
   unpopulateItemDetail(el, i) {
     if (!this.getItemImageSrc) return;
@@ -867,6 +949,138 @@ Internal.prototype = {
     if (!img) return;
     img.style.transition = 'none';
     img.style.opacity = 0;
+  },
+
+  /**
+   * Cache an image in memory so that
+   * is can be quickly retrieved next
+   * time the list-item needs to be
+   * rendered.
+   *
+   * If the user has set the length/size
+   * of the cache to falsy then we don't
+   * do any caching.
+   *
+   * TODO: Some list items may share the
+   * same image src. If we have a matching
+   * src in already in the cache we could
+   * reuse that object to save memory.
+   *
+   * Although this gets tricky when we want
+   * to revokeObjectURL() and don't know how
+   * many list-items depend on it.
+   *
+   * @param  {Number} index
+   * @param  {Blob|String} raw
+   * @return {Object}
+   * @private
+   */
+  cacheImage(image, index) {
+    if (!this.el.imageCacheLength) return;
+    if (!this.el.imageCacheSize) return;
+    this.images.hash[index] = image;
+    this.images.list.push(index);
+    this.images.bytes += image.bytes;
+    this.checkImageCacheLimit();
+    debug('cached image', image, this.images.bytes);
+    return image;
+  },
+
+  /**
+   * Attempt to fetch an image
+   * for the given item index.
+   *
+   * @param  {Number} index
+   * @return {Object|*}
+   * @private
+   */
+  getCachedImage(index) {
+    debug('get cached image', index);
+    return this.images.hash[index];
+  },
+
+  /**
+   * Check there is space remaining in
+   * the image cache discarding entries
+   * when we're full.
+   *
+   * The cache is full when either the
+   * size (bytes) or the length is breached.
+   * We use length as well as bytes as we
+   * don't want to store 1000s of strings
+   * in memory.
+   *
+   * When a limit is breached, we discard
+   * half of the cached images not currently
+   * in use, then we checkImageCacheLimit()
+   * once more.
+   *
+   * We aim to keep a relatively full cache
+   * to keep things fast, but don't want to
+   * be discarding every time a new image
+   * is loaded.
+   *
+   * @private
+   */
+  checkImageCacheLimit() {
+    var cachedImages = this.images.list.length;
+    var exceeded = this.images.bytes > this.el.imageCacheSize
+      || cachedImages > this.el.imageCacheLength;
+
+    if (!exceeded) return;
+
+    debug('image cache limit exceeded', exceeded);
+    var itemCount = this.fastList.geometry.maxItemCount;
+    var toDiscard = (cachedImages - itemCount) / 2;
+
+    // prevent infinite loop when
+    // imageCacheLength < maxItemCount
+    if (toDiscard <= 0) return;
+    debug('discarding: ', toDiscard);
+
+    while (toDiscard-- > 0) {
+      this.discardOldestImage();
+      debug('bytes used', this.images.bytes);
+    }
+
+    // double-check we've freed enough memory
+    this.checkImageCacheLimit();
+  },
+
+  /**
+   * Discard the oldest image in
+   * the image cache.
+   *
+   * When an image has `bytes` we assume
+   * it was a Blob and revokeObjectURL()
+   * to make sure we don't memory leak.
+   *
+   * @return {Boolean} success/falure
+   * @private
+   */
+  discardOldestImage() {
+    debug('discard oldest image');
+    if (!this.images.list.length) return false;
+    var index = this.images.list.shift();
+    var image = this.images.hash[index];
+
+    if (image.bytes) {
+      URL.revokeObjectURL(image.src);
+      this.images.bytes -= image.bytes;
+      debug('revoked url', image.src);
+    }
+
+    delete this.images.hash[index];
+    return true;
+  },
+
+  /**
+   * Completely empty the image cache.
+   *
+   * @private
+   */
+  emptyImageCache() {
+    while (this.images.list.length) this.discardOldestImage();
   },
 
   /**
@@ -1345,6 +1559,27 @@ Picker.prototype = {
  */
 
 module.exports = component.register('gaia-fast-list', GaiaFastListProto);
+
+/**
+ * Utils
+ */
+
+/**
+* Normalizes supported image return
+* value to a String.
+*
+* When Blobs are returned we createObjectURL,
+* when the cache is discarded we revokeObjectURL
+* later.
+*
+* @param  {Blob|String} src
+* @return {Object}  {src, bytes}
+*/
+function normalizeImageSrc(src) {
+  if (typeof src == 'string') return src;
+  else if (src instanceof Blob) return URL.createObjectURL(src);
+  else throw new Error('invalid image src');
+}
 
 });})(typeof define=='function'&&define.amd?define
 :(function(n,w){return typeof module=='object'?function(c){

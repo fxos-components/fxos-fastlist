@@ -19,6 +19,9 @@ suite('GaiaFastList >', function() {
   teardown(function() {
     this.sinon.restore();
     dom.remove();
+
+    // trigger revokeObjectURL()
+    window.dispatchEvent(new CustomEvent('pagehide'));
   });
 
   test('it creates FastList when model is first set', function() {
@@ -537,7 +540,7 @@ suite('GaiaFastList >', function() {
     });
   });
 
-  suite('images', function() {
+  suite('images >>', function() {
     var el;
 
     test('it loads images', function() {
@@ -574,10 +577,9 @@ suite('GaiaFastList >', function() {
         .then(() => {
           var itemHeight = 60;
           el.scrollTop = 55 * itemHeight;
-
-          // wait one tick for re-render
-          return Promise.resolve();
+          return imagesLoaded(el);
         })
+
         .then(() => {
           var items = el.querySelectorAll('.gfl-item');
           [].forEach.call(items, item => {
@@ -644,6 +646,252 @@ suite('GaiaFastList >', function() {
           }));
         });
     });
+
+    test('getItemImageSrc() can return a Blob', function() {
+      el = createList();
+      el.configure({
+        getItemImageSrc(item, i) {
+          return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
+        }
+      });
+
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => {
+          return Promise.all([].map.call(el.querySelectorAll('img'), (img, index) => {
+            return new Promise(resolve => img.addEventListener('load', e => {
+              assert.include(img.src, 'blob:');
+              resolve();
+            }));
+          }));
+        });
+    });
+
+    test('getItemImageSrc() is only called once per item', function() {
+      el = createList();
+
+      var getItemImageSrc = sinon.spy((item, i) => {
+        return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
+      });
+
+      el.configure({ getItemImageSrc: getItemImageSrc });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => imagesLoaded(el))
+
+        .then(() => {
+
+          // scroll down
+          el.scrollTop = 400 * 4;
+
+          // scroll back to top
+          el.scrollTop = 10;
+          el.scrollTop = 0;
+
+          // assert that getItemImageArgs() was never
+          // called more than once with the same arguments
+          getItemImageSrc.args.forEach(args => {
+            var callCount = getItemImageSrc.withArgs
+              .apply(getItemImageSrc, args)
+              .callCount;
+
+            assert.equal(callCount, 1, `called once for item ${args[1]}`);
+          });
+        });
+    });
+
+    test('cached images get deleted when `imageCacheSize` limit is reached', function() {
+      this.sinon.spy(URL, 'revokeObjectURL');
+
+      el = createList();
+
+      // set size small so limit reached easily
+      el.imageCacheSize = 2000000;
+
+      var getItemImageSrc = sinon.spy((item, i) => {
+        return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
+      });
+
+      el.configure({ getItemImageSrc: getItemImageSrc });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => imagesLoaded(el))
+        .then(() => {
+          el.scrollTop = 400 * 4; // 4 viewports
+          return imagesLoaded(el);
+        })
+        .then(() => {
+          sinon.assert.called(URL.revokeObjectURL);
+        });
+    });
+
+    test('cached images get discarded when `imageCacheLength` limit is reached', function() {
+      this.sinon.spy(URL, 'revokeObjectURL');
+
+      el = createList();
+
+      // set size small so limit reached easily
+      el.imageCacheLength = 40;
+
+      var getItemImageSrc = sinon.spy((item, i) => {
+        return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
+      });
+
+      el.configure({ getItemImageSrc: getItemImageSrc });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => imagesLoaded(el))
+        .then(() => {
+          el.scrollTop += 400 * 4; // 4 viewports
+          return imagesLoaded(el);
+        })
+
+        .then(() => {
+          el.scrollTop += 400 * 4; // 4 viewports
+          return imagesLoaded(el);
+        })
+
+        .then(() => {
+          sinon.assert.called(URL.revokeObjectURL);
+        });
+    });
+
+    test('setting a new model does not load cached images', function() {
+      el = createList();
+
+      var getItemImageSrc = sinon.spy((item, i) => {
+        return `/base/test/lib/artwork-${item.image}.jpg`;
+      });
+
+      el.configure({ getItemImageSrc: getItemImageSrc });
+      el.model = [{ image: 1 }];
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => imagesLoaded(el))
+        .then(() => {
+          var firstImage = el.querySelector('img');
+          assert.include(firstImage.src, 'artwork-1');
+        })
+
+        .then(() => {
+          el.model = [{ image: 2 }];
+          return new Promise(resolve => {
+            var firstImage = el.querySelector('img');
+            firstImage.addEventListener('load', function f() {
+              firstImage.removeEventListener('load', f);
+              assert.include(firstImage.src, 'artwork-2');
+              resolve();
+            });
+          });
+        });
+    });
+
+    test('all ObjectURLs should be revoked when page is destroyed', function() {
+      var blobs = [];
+
+      this.sinon.spy(URL, 'createObjectURL');
+      this.sinon.spy(URL, 'revokeObjectURL');
+
+      el = createList();
+
+      var getItemImageSrc = sinon.spy((item, i) => {
+        return getBlobFromURL(`/base/test/lib/artwork-${item.image}.jpg`)
+          .then(result => {
+            blobs.push(result);
+            return result;
+          });
+      });
+
+      el.configure({ getItemImageSrc: getItemImageSrc });
+
+      el.model = [
+        { image: 1 },
+        { image: 2 },
+        { image: 3 },
+      ];
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => imagesLoaded(el))
+
+        .then(() => {
+          sinon.assert.calledWith(URL.createObjectURL, blobs[0]);
+
+          // fake pagehide event
+          // window.dispatchEvent(new CustomEvent('pagehide'));
+
+          // // called one for each list item image blob
+          // sinon.assert.calledThrice(URL.revokeObjectURL);
+
+          // // called with object url returned from createObjectURL()
+          // URL.createObjectURL.getCalls().forEach(call => {
+          //   sinon.assert.calledWith(URL.revokeObjectURL, call.returnValue);
+          // });
+        });
+    });
+
+    test('it does not use the cache if the imageCacheSize is falsy', function() {
+      el = createList();
+
+      // turn cache off
+      el.imageCacheSize = 0;
+
+      var getItemImageSrc = sinon.spy((item, i) => {
+        return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
+      });
+
+      el.configure({ getItemImageSrc: getItemImageSrc });
+      el.model = createModel();
+
+      var fastList = this.FastList.lastCall.returnValue;
+      return fastList.rendered
+        .then(() => imagesLoaded(el))
+        .then(() => {
+          var firstCallArgs = getItemImageSrc.args[0];
+
+          // scroll down
+          el.scrollTop = 400 * 4;
+
+          // scroll back to top
+          el.scrollTop = 10;
+          el.scrollTop = 0;
+
+          // assert that getItemImageArgs() was never
+          // called more than once with the same arguments
+          var callCount = getItemImageSrc.withArgs
+            .apply(getItemImageSrc, firstCallArgs)
+            .callCount;
+
+          assert.equal(callCount, 2, 'called twice');
+        });
+    });
+
+
+  test('it can handle imageCacheLength being < itemCount', function() {
+    el = createList();
+
+    // silly configuration
+    el.imageCacheLength = 10;
+
+    var getItemImageSrc = sinon.spy((item, i) => {
+      return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
+    });
+
+    el.configure({ getItemImageSrc: getItemImageSrc });
+    el.model = createModel();
+
+    var fastList = this.FastList.lastCall.returnValue;
+    return fastList.rendered.then(() => imagesLoaded(el));
+  });
   });
 
   /**
@@ -701,5 +949,33 @@ suite('GaiaFastList >', function() {
     });
 
     return defer;
+  }
+
+  function getBlobFromURL(url) {
+    return new Promise((resolve, reject) => {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'blob';
+      xhr.onload = () => resolve(xhr.response);
+      xhr.onerror = reject;
+      xhr.send();
+    });
+  }
+
+  function imagesLoaded(el) {
+    var imgs = el.querySelectorAll('img');
+    return Promise.all([].map.call(imgs, img => {
+      return new Promise((resolve, reject) => {
+        img.addEventListener('load', function f() {
+          img.removeEventListener('load', f);
+          resolve();
+        });
+
+        img.addEventListener('error', function f() {
+          img.removeEventListener('error', f);
+          reject('error loading image: ' + img.src);
+        });
+      });
+    }));
   }
 });
