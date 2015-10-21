@@ -182,7 +182,7 @@ suite('GaiaFastList >>', function() {
         });
     });
 
-    test('it caches the final height once .complete() is called', function() {
+    test('it caches the final height once .cache() is called', function() {
       var itemHeight = 60;
 
       var listCreated = afterNext(InternalProto, 'createList');
@@ -348,6 +348,10 @@ suite('GaiaFastList >>', function() {
     test('it does not cause sync reflow when `top` and `bottom` attributes are used', function() {
       var listCreated = afterNext(InternalProto, 'createList');
       var el = createList('top=50 bottom=0');
+      var inner = el.shadowRoot.querySelector('.inner');
+
+      inner.style.height = '400px';
+      el.style.height = '';
 
       el.model = createModel();
 
@@ -357,7 +361,36 @@ suite('GaiaFastList >>', function() {
 
           var listCreated = afterNext(InternalProto, 'createList');
           var el = createList();
+          var inner = el.shadowRoot.querySelector('.inner');
 
+          inner.style.height = '400px';
+          el.style.height = '';
+          el.model = createModel();
+
+          return listCreated;
+        })
+
+        .then(() => {
+          sinon.assert.called(spy);
+        });
+    });
+
+    test('it does not cause reflow when list.style.height is set', function() {
+      var listCreated = afterNext(InternalProto, 'createList');
+      var el = createList('top=50 bottom=0');
+
+      el.model = createModel();
+
+      return listCreated
+        .then(() => {
+          sinon.assert.notCalled(spy);
+
+          var listCreated = afterNext(InternalProto, 'createList');
+          var el = createList();
+          var inner = el.shadowRoot.querySelector('.inner');
+
+          inner.style.height = '400px';
+          el.style.height = '';
           el.model = createModel();
           return listCreated;
         })
@@ -988,6 +1021,66 @@ suite('GaiaFastList >>', function() {
         assert.isNull(cache, 'no cache render');
         assert.equal(items.length, 7, 'critical items only');
         done();
+      });
+    });
+  });
+
+  suite('fast gradient >>', function() {
+    test('it\'s added only after FastList setup is complete', function(done) {
+      var el = createList();
+      el.model = createModel();
+
+      el.addEventListener('rendered', () => {
+        var fastList = this.FastList.lastCall.returnValue;
+        var list = el.shadowRoot.querySelector('ul');
+        var backgroundImage = getComputedStyle(list).backgroundImage;
+
+        // Should not be present on first render
+        assert.equal(backgroundImage, 'none');
+
+        // Wait until FastList fully setup
+        fastList.complete.then(() => {
+          setTimeout(() => {
+            var backgroundImage = getComputedStyle(list).backgroundImage;
+            assert.include(backgroundImage, 'linear-gradient');
+            done();
+          });
+        });
+      });
+    });
+
+    test('it\'s not applied when full-height is shorter than viewport', function(done) {
+      var el = createList();
+      el.model = createModel().slice(0, 5);
+
+      el.addEventListener('rendered', () => {
+        var fastList = this.FastList.lastCall.returnValue;
+        fastList.complete.then(() => {
+          setTimeout(() => {
+            var list = el.shadowRoot.querySelector('ul');
+            var backgroundImage = getComputedStyle(list).backgroundImage;
+            assert.equal(backgroundImage, 'none');
+            done();
+          });
+        });
+      });
+    });
+
+    test('a second blocking gradient is applied to cover offset region', function(done) {
+      var offset = '99';
+      var el = createList(`offset=${offset}`);
+      el.model = createModel();
+
+      el.addEventListener('rendered', () => {
+        var fastList = this.FastList.lastCall.returnValue;
+        fastList.complete.then(() => {
+          setTimeout(() => {
+            var list = el.shadowRoot.querySelector('ul');
+            var backgroundSize = getComputedStyle(list).backgroundSize;
+            assert.include(backgroundSize, `100% ${offset}`);
+            done();
+          });
+        });
       });
     });
   });
