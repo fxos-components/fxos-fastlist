@@ -529,7 +529,7 @@ var GaiaFastListProto = {
 function Internal(el) {
   this.el = el;
 
-  this.gotCache = this.renderCache();
+  this.renderedCache = this.renderCache();
   var shadow = el.shadowRoot;
   this.images = {
     list: [],
@@ -664,28 +664,45 @@ Internal.prototype = {
   },
 
   /**
-   * Creates the FastList and caches
-   * the rendered content.
+   * Creates the FastList.
    *
-   * Layerizing is the process of turning
-   * each list-item into its own layer.
-   * It's expensive so we defer it till
-   * after the first-paint.
-   *
+   * @return {Promise}
    * @private
    */
   createList() {
-    return this.listCreated = this.gotCache
-      .then(result => {
+    return this.listCreated = this.renderedCache
+      .then(() => {
         debug('create list');
         this.fastList = new this.el.FastList(this);
-        return this.fastList.complete;
+        return this.fastList.rendered;
       })
 
       .then(() => {
+        this.firstRender();
         this.els.list.style.transform = '';
         this.removeCachedRender();
+        return this.fastList.complete;
       });
+  },
+
+  /**
+   * Dispatches a 'rendered' event
+   * to signal to the user that
+   * the component is ready to
+   * be revealed.
+   *
+   * We use events not Promises here
+   * so that the user can attach
+   * event listeners to a component
+   * before it's been upgraded.
+   *
+   * @private
+   */
+  firstRender() {
+    if (this.rendered) return;
+    var event = new CustomEvent('rendered', { bubbles: false });
+    this.el.dispatchEvent(event);
+    this.rendered = true;
   },
 
   /**
@@ -1259,6 +1276,17 @@ Internal.prototype = {
     }
   },
 
+  /**
+   * Get the list's current scroll position.
+   *
+   * Before FastList is created we
+   * return the initialScrollTop
+   * as the real scrollTop will
+   * return `0` before the list
+   * has a height.
+   *
+   * @return {Number}
+   */
   getScrollTop() {
     debug('get scroll top');
     return this.fastList
@@ -1266,6 +1294,21 @@ Internal.prototype = {
       : this.initialScrollTop;
   },
 
+  /**
+   * The key used to store the
+   * cached HTML and height under.
+   *
+   * When used with the `Cache` API
+   * this end up being appended to
+   * the current URL meaning we get
+   * a unique cache key per page.
+   *
+   * 'example.com/page-a/gflCacheKey'
+   * 'example.com/page-b/gflCacheKey'
+   * 'example.com/page-c/gflCacheKey'
+   *
+   * @type {String}
+   */
   cacheKey: 'gflCacheKey',
 
   /**
@@ -1376,13 +1419,13 @@ Internal.prototype = {
    * @return {Promise}
    */
   renderCache() {
-    if (!this.el.caching) return Promise.resolve(false);
+    if (!this.el.caching) return Promise.resolve();
     debug('render cache');
 
     return this.getCache()
       .then(result => {
         debug('got cache');
-        if (!result) return false;
+        if (!result) return;
 
         var height = result.height;
         var html = result.html;
@@ -1404,9 +1447,10 @@ Internal.prototype = {
         // cached height on the first render.
         this.cachedHeight = height;
 
-        // Tell the callee that a cache
-        // was found and processed.
-        return true;
+        // Dispatch a 'rendered' event
+        // so the user knows the list
+        // is ready to be revealed.
+        this.firstRender();
       });
   },
 

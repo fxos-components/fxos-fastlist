@@ -1,5 +1,5 @@
 /* global suite, sinon, setup, teardown,
-test, assert, GaiaFastList */
+test, assert, GaiaFastList, FastList */
 
 /*jshint maxlen:false*/
 
@@ -954,6 +954,41 @@ suite('GaiaFastList >>', function() {
 
       return listCreated
         .then(() => assert.equal(el.scrollTop, 50));
+    });
+  });
+
+  suite('\'rendered\' event >>', function() {
+    test('it fires when a cache in rendered', function(done) {
+      var afterSetCache = afterNext(InternalProto, 'setCache');
+      var el = createList('caching');
+
+      el.model = createModel();
+      el.cache();
+
+      afterSetCache
+        .then(() => {
+          el.remove();
+          el = createList('caching');
+          el.addEventListener('rendered', () => {
+            var cache = el.querySelector('.cached');
+            assert.ok(cache);
+            done();
+          });
+        });
+    });
+
+    test('without cache it fires when fast-list\'s critical render has completed', function(done) {
+      var el = createList();
+      el.model = createModel();
+
+      el.addEventListener('rendered', function() {
+        var items = el.querySelectorAll('.gfl-item');
+        var cache = el.querySelector('.cached');
+
+        assert.isNull(cache, 'no cache render');
+        assert.equal(items.length, 7, 'critical items only');
+        done();
+      });
     });
   });
 

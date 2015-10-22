@@ -8,6 +8,11 @@ list.configure({
   getSectionName: item => item.date
 });
 
+list.addEventListener('rendered', function fn(argument) {
+  list.removeEventListener('rendered', fn);
+  document.body.hidden = false;
+});
+
 var chunkSize = 100;
 var total = 350;
 var count = 0;
