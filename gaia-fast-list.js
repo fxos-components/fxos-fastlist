@@ -28,6 +28,18 @@ var touchend = isTouch ? 'touchend' : 'mouseup';
 var debug = 0 ? (...args) => console.log('[GaiaFastList]', ...args) : () => {};
 
 /**
+ * Cache to persist content.
+ *
+ * We open ASAP as we need the cached
+ * HTML content for the first-paint.
+ * As it's async it can be done in
+ * the background.
+ *
+ * @type {Promise}
+ */
+var cachesOpen = caches.open('gfl');
+
+/**
  * Used to hide private properties behind.
  *
  * @type {Symbol}
@@ -110,11 +122,11 @@ var GaiaFastListProto = {
    *
    * @public
    */
-  complete() {
+  cache() {
+    debug('cache');
     if (!this.caching) return;
-    debug('complete');
     this[keys.internal].cachedHeight = null;
-    this[keys.internal].updateCachedHeight();
+    this[keys.internal].updateCache();
   },
 
   /**
@@ -194,12 +206,8 @@ var GaiaFastListProto = {
     },
 
     scrollTop: {
-      get() { return this[keys.internal].fastList.scrollTop; },
-      set(value) {
-        var fastList = this[keys.internal].fastList;
-        if (fastList) fastList.scrollInstantly(value);
-        else this[keys.internal].initialScrollTop = value;
-      }
+      get() { return this[keys.internal].getScrollTop(); },
+      set(value) { this[keys.internal].setScrollTop(value); }
     },
 
     minScrollHeight: {
@@ -230,13 +238,13 @@ var GaiaFastListProto = {
     </div>
 
     <style>
-      * { margin: 0; font: inherit; }
 
       :host {
         display: block;
         height: 100%;
 
         color: var(--text-color-minus);
+        overflow: hidden;
       }
 
       .inner {
@@ -250,16 +258,11 @@ var GaiaFastListProto = {
         top: 0; bottom: 0;
 
         padding: 0 17px;
-        overflow: hidden !important;
       }
 
       [picker] .fast-list {
         offset-inline-end: 26px; /* picker width */
         padding-inline-end: 12px;
-      }
-
-      .fast-list.layerize {
-        overflow-y: scroll !important;
       }
 
       .fast-list.empty {
@@ -312,6 +315,9 @@ var GaiaFastListProto = {
         z-index: 100;
 
         margin: 0 !important;
+        margin-top: -0.5px !important;
+        padding-top: 0.5px;
+        width: calc(100% + 1px);
       }
 
       ::content .background {
@@ -322,40 +328,36 @@ var GaiaFastListProto = {
 
       ::content .gfl-item {
         position: absolute;
-        left: 0; top: 0;
+        left: 0;
+        top: 0;
+        right: 0;
         z-index: 10;
 
         display: flex;
         flex-direction: column;
         justify-content: center;
-        box-sizing: border-box;
-        width: 100%;
         height: 60px;
         padding: 0 9px;
+        overflow: hidden;
+        box-sizing: border-box;
 
         list-style-type: none;
         text-decoration: none;
-        will-change: initial !important;
         border-top: solid 1px var(--border-color, #e7e7e7);
+        background: var(--background);
       }
 
       ::content .gfl-item.first {
         border-top: 0;
       }
 
-      :host(.layerize) ::content .gfl-item {
-        will-change: transform !important;
-      }
-
       ::content .image {
         position: absolute;
-        top: 0;
-        offset-inline-end: 0;
+        top: 8px;
+        offset-inline-end: 7px;
 
-        width: 60px;
-        height: 60px;
-
-        background-color: var(--border-color);
+        width: 44px;
+        height: 44px;
       }
 
       ::content .image.round,
@@ -367,17 +369,22 @@ var GaiaFastListProto = {
 
       ::content .gfl-item .image.round {
         top: 8.5px;
+        offset-inline-end: 0;
+        background: var(--border-color);
       }
 
       ::content .gfl-item img {
         position: absolute;
         left: 0; top: 0;
 
-        width: 60px;
-        height: 60px;
+        width: 44px;
+        height: 44px;
 
         opacity: 0;
-        will-change: opacity;
+      }
+
+      ::content .cached .gfl-item img {
+        display: none;
       }
 
       ::content h3,
@@ -409,6 +416,10 @@ var GaiaFastListProto = {
         margin: 0;
         font-size: 15px;
         line-height: 1.35em;
+      }
+
+      ::content a {
+        color: inherit;
       }
 
       .picker {
@@ -516,9 +527,10 @@ var GaiaFastListProto = {
  * @param {GaiaFastList} el
  */
 function Internal(el) {
-  var shadow = el.shadowRoot;
-
   this.el = el;
+
+  this.gotCache = this.renderCache();
+  var shadow = el.shadowRoot;
   this.images = {
     list: [],
     hash: {},
@@ -541,15 +553,12 @@ function Internal(el) {
   this.list = this.els.list;
   this.itemContainer = el;
 
-  this.injectItemsFromCache();
   this.configureTemplates();
-  this.setEmpty(!this.els.cached);
   this.setupPicker();
 
   // don't memory leak ObjectURLs
   addEventListener('pagehide', () => this.emptyImageCache());
-
-  debug('internal initialized');
+  debug('initialized');
 }
 
 Internal.prototype = {
@@ -586,7 +595,6 @@ Internal.prototype = {
     this.sections = this.sectionize(model);
     if (!this.fastList) this.createList();
     else this.reloadData();
-    this.setEmpty(false);
   },
 
   /**
@@ -600,90 +608,12 @@ Internal.prototype = {
    * @private
    */
   reloadData() {
-    this.emptyImageCache();
-    this.fastList.reloadData();
-  },
-
-  setupPicker() {
-    if (!this.el.picker) return;
-
-    this.picker = new Picker(this.els.picker);
-    this.onPickingStarted = this.onPickingStarted.bind(this);
-    this.onPickingEnded = this.onPickingEnded.bind(this);
-    this.onPicked = this.onPicked.bind(this);
-
-    this.picker.addEventListener('started', this.onPickingStarted);
-    this.picker.addEventListener('ended', this.onPickingEnded);
-    this.picker.addEventListener('picked', this.onPicked);
-    debug('picker setup');
-  },
-
-  teardownPicker() {
-    if (!this.picker) return;
-
-    this.picker.removeEventListener('picked', this.onPicked);
-    this.picker.destroy();
-
-    delete this.onPicked;
-    delete this.onPickingEnded;
-    delete this.onPickingStarted;
-    delete this.picker;
-
-    debug('picker torndown');
-  },
-
-  onPicked() {
-    debug('on picked');
-    var link = this.picker.selected;
-    this.setOverlayContent(link.dataset.icon, link.textContent);
-  },
-
-  onPickingStarted() {
-    this.els.overlay.classList.add('visible');
-  },
-
-  onPickingEnded() {
-    debug('on picking ended');
-    var link = this.picker.selected;
-    var id = link.hash.substr(1);
-
-    this.jumpToId(id);
-    this.els.overlay.classList.remove('visible');
-  },
-
-  /**
-   * Set the picker overlay content
-   * prefering icons over text.
-   *
-   * The manipulation is done is such
-   * a way that prevents reflow.
-   *
-   * @param {String} icon
-   * @param {String} text
-   */
-  setOverlayContent(icon, text) {
-    var letterNode = this.els.overlayText;
-    var iconNode = this.els.overlayIcon;
-
-    if (icon) {
-      iconNode.firstChild.data = icon;
-      letterNode.style.visibility = 'hidden';
-      iconNode.style.visibility = 'visible';
-    } else {
-      letterNode.firstChild.data = text;
-      iconNode.style.visibility = 'hidden';
-      letterNode.style.visibility = 'visible';
-    }
-  },
-
-  /**
-   * Toggle some basic placeholder styling
-   * when we don't have any items to render.
-   *
-   * @param {Boolean} value
-   */
-  setEmpty(value) {
-    this.container.classList.toggle('empty', value);
+    return this.listCreated
+      .then(() => {
+        debug('reload data');
+        this.emptyImageCache();
+        return this.fastList.reloadData();
+      });
   },
 
   /**
@@ -745,24 +675,17 @@ Internal.prototype = {
    * @private
    */
   createList() {
-    debug('create list');
-    this.fastList = new this.el.FastList(this);
-    this.fastList.rendered.then(() => {
-      this.removeCachedRender();
-      this.updateCachedHtml();
-      setTimeout(() => this.layerize(), 360);
-    });
-  },
+    return this.listCreated = this.gotCache
+      .then(result => {
+        debug('create list');
+        this.fastList = new this.el.FastList(this);
+        return this.fastList.complete;
+      })
 
-  /**
-   * Makes the list scrollable and creates
-   * a layer out of each list-item.
-   *
-   * @private
-   */
-  layerize() {
-    this.el.classList.add('layerize');
-    this.container.classList.add('layerize');
+      .then(() => {
+        this.els.list.style.transform = '';
+        this.removeCachedRender();
+      });
   },
 
   /**
@@ -830,14 +753,10 @@ Internal.prototype = {
       || poplar.parse(this.templateHeader);
 
     var header = poplar.create(this.parsedSection.cloneNode(true));
-
     var section = document.createElement('section');
-    var background = document.createElement('div');
 
-    background.classList.add('background');
     header.classList.add('gfl-header');
     section.appendChild(header);
-    section.appendChild(background);
     section.classList.add('gfl-section');
     section.id = `gfl-section-${name}`;
 
@@ -857,15 +776,7 @@ Internal.prototype = {
    */
   populateItem(el, i) {
     var record = this.getRecordAt(i);
-    var successful = poplar.populate(el, record);
-
-    if (!successful) {
-      debug('not a poplar element');
-      var replacement = this.fastList.createItem();
-      this.fastList.replaceChild(replacement, el);
-      return this.populateItem(replacement, i);
-    }
-
+    poplar.populate(el, record);
     el.classList.toggle('first', !!record[keys.first]);
   },
 
@@ -884,6 +795,7 @@ Internal.prototype = {
    */
   populateItemDetail(el, i) {
     if (!this.getItemImageSrc) return;
+    debug('populate item detail', i);
 
     var img = el[keys.img];
     if (!img) return;
@@ -927,8 +839,10 @@ Internal.prototype = {
       debug('load image', image);
       img.src = image.src;
       img.onload = () => {
-        requestAnimationFrame(() => {
-          img.style.transition = 'opacity 250ms';
+        debug('image loaded', i);
+        img.raf = requestAnimationFrame(() => {
+          img.raf = null;
+          img.style.transition = 'opacity 500ms';
           img.style.opacity = 1;
         });
       };
@@ -945,10 +859,20 @@ Internal.prototype = {
    */
   unpopulateItemDetail(el, i) {
     if (!this.getItemImageSrc) return;
+    debug('unpopulate item detail');
+
     var img = el[keys.img];
     if (!img) return;
+
+    // Hide image instantly
     img.style.transition = 'none';
     img.style.opacity = 0;
+
+    debug('raf', img.raf);
+
+    // Clear any pending callbacks
+    if (img.raf) cancelAnimationFrame(img.raf);
+    img.onload = img.raf = null;
   },
 
   /**
@@ -982,7 +906,7 @@ Internal.prototype = {
     this.images.list.push(index);
     this.images.bytes += image.bytes;
     this.checkImageCacheLimit();
-    debug('cached image', image, this.images.bytes);
+    debug('image cached', image, this.images.bytes);
     return image;
   },
 
@@ -1092,11 +1016,7 @@ Internal.prototype = {
    */
   populateSection(el, section) {
     var title = el.firstChild;
-    var background = title.nextSibling;
-    var height = this.getFullSectionHeight(section);
-
     poplar.populate(title, { section: section });
-    background.style.height = height + 'px';
   },
 
   /**
@@ -1108,6 +1028,12 @@ Internal.prototype = {
    * for free, else we must force a reflow
    * by using `clientHeight`.
    *
+   * NOTE: We use the innerHeight of the `parent`
+   * window to prevent forcing a reflow when
+   * gaia-fast-list is inside an iframe. This
+   * means that offsets must be relative to
+   * viewport *not* the closest window.
+   *
    * @return {Number}
    */
   getViewportHeight() {
@@ -1116,7 +1042,7 @@ Internal.prototype = {
     var top = this.el.top;
 
     return (top != null && bottom != null)
-      ? window.innerHeight - top - bottom
+      ? parent.innerHeight - top - bottom
       : this.el.clientHeight;
   },
 
@@ -1173,6 +1099,7 @@ Internal.prototype = {
     var headerHeight = this.getSectionHeaderHeight();
     var itemHeight = this.getItemHeight();
     var fullLength = this.getFullLength();
+    var lastIndex = fullLength - 1;
     var index = 0;
 
     for (var name in sections) {
@@ -1196,7 +1123,10 @@ Internal.prototype = {
       }
     }
 
+    // Can't be more than the last index
+    index = Math.min(index, lastIndex);
     // debug('got index', index);
+
     return index;
   },
 
@@ -1226,7 +1156,7 @@ Internal.prototype = {
   },
 
   /**
-   * Jump scroll position to th top of a section.
+   * Jump scroll position to the top of a section.
    *
    * If a section of the given name is not
    * found the scroll postion will not
@@ -1266,13 +1196,8 @@ Internal.prototype = {
     if (found) this.el.scrollTop = offset;
   },
 
-  getFullLength() {
-    return this.model.length;
-  },
-
-  getItemHeight() {
-    return this.itemHeight;
-  },
+  getFullLength() { return this.model.length; },
+  getItemHeight() { return this.itemHeight; },
 
   getFullHeight() {
     debug('get full height', this.cachedHeight);
@@ -1311,110 +1236,178 @@ Internal.prototype = {
   },
 
   /**
-   * Get a some cached data by key.
+   * Set the scroll position of the list.
+   *
+   * It is common for users to want to set
+   * an initial scrollTop before the real
+   * list has actually rendered.
+   *
+   * To support this we transform the list element
+   * and unset the transform once rendered.
+   * This is to avoid reflowing an expensive
+   * component.
+   *
+   * @param {Number} value
+   */
+  setScrollTop(value) {
+    debug('set scroll top', value);
+    if (this.fastList) {
+      this.fastList.scrollInstantly(value);
+    } else {
+      this.els.list.style.transform = `translateY(${-value}px)`;
+      this.initialScrollTop = value;
+    }
+  },
+
+  getScrollTop() {
+    debug('get scroll top');
+    return this.fastList
+      ? this.fastList.scrollTop
+      : this.initialScrollTop;
+  },
+
+  cacheKey: 'gflCacheKey',
+
+  /**
+   * Get content from cache.
    *
    * @param  {String} key
-   * @return {String}
+   * @return {Array}
+   * @private
    */
-  getCache(key) {
-    return localStorage.getItem(`${this.getCacheKey()}:${key}`);
+  getCache() {
+    return cachesOpen.then(cache => {
+      debug('get cache', this.cacheKey);
+      return cache.match(new Request(this.cacheKey))
+        .then(res => res && res.json());
+    });
   },
 
   /**
    * Store some data in the cache.
    *
-   * The scheduler.mutation() block means that
-   * it won't interupt user scrolling.
-   *
-   * @param {String} key
-   * @param {String} value
+   * @param {Array} valuex
+   * @private
    */
-  setCache(key, value) {
-    debug('set cache (sync)', key);
-    setTimeout(() => {
-      scheduler.mutation(() => {
-        localStorage.setItem(`${this.getCacheKey()}:${key}`, value);
-        debug('set cache (async)', key);
-      });
-    }, 500);
+  setCache(data) {
+    return cachesOpen.then(cache => {
+      debug('set cache', data);
+      var req = new Request(this.cacheKey);
+      var res = new Response(JSON.stringify(data));
+      return cache.put(req, res);
+    });
   },
 
   /**
-   * Clear all caches.
+   * Clear the cache.
+   *
+   * @private
    */
   clearCache() {
-    debug('clear cache');
-    var prefix = this.getCacheKey();
-    localStorage.removeItem(`${prefix}:html`);
-    localStorage.removeItem(`${prefix}:height`);
+    return cachesOpen.then(cache => {
+      debug('clear cache');
+      return cache.delete(this.cacheKey);
+    });
   },
 
   /**
-   * Attempts to generate a storage
-   * key prefix unique to this list.
+   * Creates a cache that contains HTML
+   * for enough items to fill the viewport
+   * and an integar representing the full
+   * height.
    *
-   * Assuming two unique lists don't
-   * use caching on the same url, if
-   * this feature is required, they
-   * must be given unique id attributes.
+   * The cache always contains content
+   * required to render scrollTop: 0.
    *
-   * @return {String}
+   * We have to dynamically create the items
+   * to cache as the user may have scrolled
+   * the list before .cache() is called,
+   * meaning the items in the DOM may
+   * not longer be for scrolTop: 0.
+   *
+   * @private
    */
-  getCacheKey() {
-    return `${this.el.tagName}:${this.el.id}:${location}`;
-  },
-
-  /**
-   * Gets the currently rendered list-item and section
-   * HTML and then persists it to localStorage later
-   * in time to prevent blocking the remaining
-   * fast-list setup.
-   */
-  updateCachedHtml() {
+  updateCache() {
     if (!this.el.caching) return;
-    debug('update cached html');
+    debug('update cache');
+    var fullHeight = this.getFullHeight();
     var maxViewportHeight = Math.max(window.innerWidth, window.innerHeight);
     var length = Math.ceil(maxViewportHeight / this.getItemHeight());
-    var items = [].slice.call(this.el.querySelectorAll('.gfl-item'), 0, length);
+    var html = '';
 
-    // remove any attributes to save bytes
-    var itemsHtml = items.map(el => el.outerHTML)
-      .join('')
-      .replace(/style\=\"[^"]+\"/g, '')
-      .replace(/data-tweak-delta=""/g, '');
+    for (var i = 0; i < length; i++) {
+      var el = this.createItem();
+      el.dataset.position = this.getPositionForIndex(i);
+      this.populateItem(el, i);
+      html += el.outerHTML;
+    }
 
-    var sections = [].slice.call(this.el.querySelectorAll('.gfl-section'));
-    var sectionsHtml = sections.map(el => el.outerHTML).join('');
+    var sections = this.el.querySelectorAll('.gfl-section');
+    var height = 0;
 
-    this.setCache('html', itemsHtml + sectionsHtml);
-    debug('cached html', itemsHtml);
-  },
+    for (var j = 0, l = sections.length; j < l; j++) {
+      html += sections[j].outerHTML;
+      height += ~~sections[j].style.height;
+      if (height >= maxViewportHeight) break;
+    }
 
-  updateCachedHeight() {
-    if (!this.el.caching) return;
-    debug('update cached height');
-    this.setCache('height', this.getFullHeight());
-  },
-
-  injectItemsFromCache() {
-    if (!this.el.caching) return;
-    debug('injecting items from cache');
-
-    var height = this.getCache('height');
-    if (height) this.cachedHeight = height;
-
-    var html = this.getCache('html');
-    if (!html) return;
-
-    this.els.cached = document.createElement('div');
-    this.els.cached.innerHTML = html;
-
-    var items = [].slice.call(this.els.cached.querySelectorAll('.gfl-item'));
-    items.forEach((el, i) => {
-      el.style.transform = 'translateY(' + el.dataset.position + 'px)';
+    this.setCache({
+      height: fullHeight,
+      html: html
     });
 
-    this.el.appendChild(this.els.cached);
+    debug('cached html', html);
+  },
+
+  /**
+   * Render the cache into the DOM.
+   *
+   * From the users perspective this will
+   * appear as though the list has rendered,
+   * when in-fact it is more like a snapshot
+   * of the list state last time they used it.
+   *
+   * As soon as the app sets `list.model` the
+   * cached render will be destroyed and
+   * the real list will take it's place.
+   * Most of the time this transition
+   * will be seamless.
+   *
+   * @return {Promise}
+   */
+  renderCache() {
+    if (!this.el.caching) return Promise.resolve(false);
+    debug('render cache');
+
+    return this.getCache()
+      .then(result => {
+        debug('got cache');
+        if (!result) return false;
+
+        var height = result.height;
+        var html = result.html;
+
+        this.els.cached = document.createElement('div');
+        this.els.cached.className = 'cached';
+        this.els.cached.innerHTML = html;
+
+        var items = this.els.cached.querySelectorAll('.gfl-item');
+        [].forEach.call(items, (el, i) => {
+          el.style.transform = `translateY(${el.dataset.position}px)`;
+        });
+
+        // Insert the cached render as an 'overlay'
+        this.el.appendChild(this.els.cached);
+
+        // This gets accessed inside .getFullHeight()
+        // so that FastList renders the *full*
+        // cached height on the first render.
+        this.cachedHeight = height;
+
+        // Tell the callee that a cache
+        // was found and processed.
+        return true;
+      });
   },
 
   /**
@@ -1430,6 +1423,82 @@ Internal.prototype = {
     delete this.els.cached;
   },
 
+  /**
+   * Picker
+   */
+
+  setupPicker() {
+    if (!this.el.picker) return;
+    debug('setup picker');
+
+    this.picker = new Picker(this.els.picker);
+    this.onPickingStarted = this.onPickingStarted.bind(this);
+    this.onPickingEnded = this.onPickingEnded.bind(this);
+    this.onPicked = this.onPicked.bind(this);
+
+    this.picker.addEventListener('started', this.onPickingStarted);
+    this.picker.addEventListener('ended', this.onPickingEnded);
+    this.picker.addEventListener('picked', this.onPicked);
+  },
+
+  teardownPicker() {
+    if (!this.picker) return;
+    debug('teardown picker');
+
+    this.picker.removeEventListener('picked', this.onPicked);
+    this.picker.destroy();
+
+    delete this.onPicked;
+    delete this.onPickingEnded;
+    delete this.onPickingStarted;
+    delete this.picker;
+  },
+
+  onPicked() {
+    debug('on picked');
+    var link = this.picker.selected;
+    this.setOverlayContent(link.dataset.icon, link.textContent);
+  },
+
+  onPickingStarted() {
+    debug('on picking started');
+    this.els.overlay.classList.add('visible');
+  },
+
+  onPickingEnded() {
+    debug('on picking ended');
+    var link = this.picker.selected;
+    var id = link.hash.substr(1);
+
+    this.jumpToId(id);
+    this.els.overlay.classList.remove('visible');
+  },
+
+  /**
+   * Set the picker overlay content
+   * prefering icons over text.
+   *
+   * The manipulation is done is such
+   * a way that prevents reflow.
+   *
+   * @param {String} icon
+   * @param {String} text
+   */
+  setOverlayContent(icon, text) {
+    var letterNode = this.els.overlayText;
+    var iconNode = this.els.overlayIcon;
+
+    if (icon) {
+      iconNode.firstChild.data = icon;
+      letterNode.style.visibility = 'hidden';
+      iconNode.style.visibility = 'visible';
+    } else {
+      letterNode.firstChild.data = text;
+      iconNode.style.visibility = 'hidden';
+      letterNode.style.visibility = 'visible';
+    }
+  },
+
   // Default header template overridden by
   // <template header> inside <gaia-fast-list>
   templateHeader: '<gaia-sub-header>${section}</gaia-sub-header>',
@@ -1440,6 +1509,12 @@ Internal.prototype = {
     '<p>${body}</p></div><div class="image"><img src="${image}"/></div></a>'
 };
 
+/**
+ * Initialize a new Alphabetical
+ * Picker Column.
+ *
+ * @param {HTMLElement} el  picker element
+ */
 function Picker(el) {
   this.el = el;
   this.els = {
@@ -1559,6 +1634,7 @@ Picker.prototype = {
  */
 
 module.exports = component.register('gaia-fast-list', GaiaFastListProto);
+module.exports.Internal = Internal; // test hook
 
 /**
  * Utils
