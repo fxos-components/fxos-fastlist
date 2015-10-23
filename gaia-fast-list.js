@@ -245,6 +245,7 @@ var GaiaFastListProto = {
 
         color: var(--text-color-minus);
         overflow: hidden;
+        text-align: start;
       }
 
       .inner {
@@ -265,35 +266,6 @@ var GaiaFastListProto = {
         padding-inline-end: 12px;
       }
 
-      .fast-list.empty {
-        background-image:
-          linear-gradient(
-            to bottom,
-            var(--border-color),
-            var(--border-color) 2px,
-            var(--background) 2px,
-            var(--background) 10px,
-            var(--background)),
-          linear-gradient(
-            to bottom,
-            var(--border-color),
-            var(--border-color) 1px,
-            transparent 1px,
-            transparent);
-
-        background-position:
-          17px 29px,
-          17px 40px;
-
-        background-size:
-          calc(100% - 34px) 13px,
-          calc(100% - 34px) 60px;
-
-        background-repeat:
-          no-repeat,
-          repeat-y;
-      }
-
       .fast-list ul {
         position: relative;
 
@@ -303,27 +275,14 @@ var GaiaFastListProto = {
         list-style: none;
       }
 
-      ::content .gfl-section {
-        position: relative;
-        padding-top: 20px;
-        box-sizing: border-box;
-      }
-
       ::content .gfl-header {
         position: sticky;
-        top: 0px;
+        top: -20px;
         z-index: 100;
 
         margin: 0 !important;
-        margin-top: -0.5px !important;
-        padding-top: 0.5px;
+        padding-top: 20px;
         width: calc(100% + 1px);
-      }
-
-      ::content .background {
-        position: absolute;
-        z-index: 0;
-        width: 100%;
       }
 
       ::content .gfl-item {
@@ -345,6 +304,7 @@ var GaiaFastListProto = {
         text-decoration: none;
         border-top: solid 1px var(--border-color, #e7e7e7);
         background: var(--background);
+        -moz-user-select: none;
       }
 
       ::content .gfl-item.first {
@@ -409,6 +369,7 @@ var GaiaFastListProto = {
 
         font-size: 20px;
         font-weight: 400;
+        font-style: normal;
         color: var(--text-color);
       }
 
@@ -605,6 +566,10 @@ Internal.prototype = {
    * may have changed or item indexed
    * may not longer map to new model.
    *
+   * We must update the fast-gradient
+   * as scrollHeight determines whether
+   * fast-gradient needs to be painted.
+   *
    * @private
    */
   reloadData() {
@@ -613,7 +578,9 @@ Internal.prototype = {
         debug('reload data');
         this.emptyImageCache();
         return this.fastList.reloadData();
-      });
+      })
+
+      .then(() => this.updateFastGradient());
   },
 
   /**
@@ -626,9 +593,8 @@ Internal.prototype = {
   sectionize(items) {
     debug('sectionize');
     var sectioned = !!this.getSectionName;
-    var hash = {};
-
-    this.hasSections = false;
+    var hasSections = false;
+    var result = {};
 
     for (var i = 0, l = items.length; i < l; i++) {
       var item = items[i];
@@ -645,8 +611,8 @@ Internal.prototype = {
       // When there is no section yet
       // we can assume that this item
       // is the first item in the section.
-      if (!hash[section]) {
-        hash[section] = [];
+      if (!result[section]) {
+        result[section] = [];
         item[keys.first] = true;
 
       // Make sure that any previously
@@ -656,15 +622,20 @@ Internal.prototype = {
         delete item[keys.first];
       }
 
-      hash[section].push(item);
-      this.hasSections = true;
+      result[section].push(item);
+      hasSections = true;
     }
 
-    return sectioned && hash;
+    this.hasSections = hasSections;
+    return sectioned && result;
   },
 
   /**
    * Creates the FastList.
+   *
+   * We add the fast-gradient last as it's
+   * expensive to paint (50-80ms) and only
+   * required for scrolling, not first paint.
    *
    * @return {Promise}
    * @private
@@ -682,7 +653,9 @@ Internal.prototype = {
         this.els.list.style.transform = '';
         this.removeCachedRender();
         return this.fastList.complete;
-      });
+      })
+
+      .then(() => this.updateFastGradient());
   },
 
   /**
@@ -770,7 +743,7 @@ Internal.prototype = {
       || poplar.parse(this.templateHeader);
 
     var header = poplar.create(this.parsedSection.cloneNode(true));
-    var section = document.createElement('section');
+    var section = document.createElement('div');
 
     header.classList.add('gfl-header');
     section.appendChild(header);
@@ -1058,9 +1031,12 @@ Internal.prototype = {
     var bottom = this.el.bottom;
     var top = this.el.top;
 
-    return (top != null && bottom != null)
-      ? parent.innerHeight - top - bottom
-      : this.el.clientHeight;
+    if (top != null && bottom != null) {
+      return parent.innerHeight - top - bottom;
+    }
+
+    return parseInt(this.el.style.height)
+      || this.el.clientHeight;
   },
 
   getSections() {
@@ -1292,6 +1268,57 @@ Internal.prototype = {
     return this.fastList
       ? this.fastList.scrollTop
       : this.initialScrollTop;
+  },
+
+  /**
+   * Programatically draws a gradient on
+   * the background of the list element
+   * so that when rendering can't keep
+   * up, users will see a scrolling
+   * gradient as a fallback.
+   *
+   * This is done programatically so that
+   * we can size and position the gradient
+   * in-line with item-height, header-height
+   * and offset.
+   *
+   * Fast-gradients are not required when the
+   * list is not scrollable.
+   *
+   * @private
+   */
+  updateFastGradient() {
+    var viewportHeight = this.getViewportHeight();
+    var fullHeight = this.getFullHeight();
+    var style = this.els.list.style;
+
+    // Fast gradient not required if not scrollable
+    if (fullHeight <= viewportHeight) {
+      style.backgroundImage = '';
+      return;
+    }
+
+    var headerHeight = this.getSectionHeaderHeight();
+    var itemHeight = this.getItemHeight();
+    var offset = this.el.offset;
+
+    style.backgroundImage =
+      `linear-gradient(
+        to bottom,
+        var(--background),
+        var(--background) 100%),
+      linear-gradient(
+        to bottom,
+        transparent,
+        transparent 20%,
+        var(--border-color) 48%,
+        var(--border-color) 52%,
+        transparent 80%,
+        transparent 100%)`;
+
+    style.backgroundRepeat = 'no-repeat, repeat-y';
+    style.backgroundPosition = `0 0, center ${headerHeight}px`;
+    style.backgroundSize = `100% ${offset}px, 98% ${itemHeight}px`;
   },
 
   /**
@@ -1599,6 +1626,7 @@ Picker.prototype = {
 
   onTouchStart(e) {
     debug('touch start');
+    e.stopPropagation();
     e.preventDefault();
     this.height = this.el.clientHeight;
     this.els.allItems = this.getAllItems();
@@ -1615,6 +1643,7 @@ Picker.prototype = {
 
   onTouchMove(e) {
     debug('touch move');
+    e.stopPropagation();
     e.preventDefault();
     var fast = (e.timeStamp - this.lastUpdate) < 50;
     if (!fast) this.update(e);
@@ -1622,6 +1651,7 @@ Picker.prototype = {
 
   onTouchEnd(e) {
     debug('touch end');
+    e.stopPropagation();
     e.preventDefault();
 
     scheduler.detachDirect(window, touchmove, this.onTouchMove);
