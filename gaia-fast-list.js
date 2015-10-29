@@ -282,6 +282,8 @@ var GaiaFastListProto = {
 
         margin: 0 !important;
         padding-top: 20px;
+        padding-bottom: 1px;
+        margin-bottom: -1px !important;
         width: calc(100% + 1px);
       }
 
@@ -308,7 +310,7 @@ var GaiaFastListProto = {
       }
 
       ::content .gfl-item.first {
-        border-top: 0;
+        border-top-color: transparent;
       }
 
       ::content .image {

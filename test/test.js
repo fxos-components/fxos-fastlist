@@ -275,12 +275,10 @@ suite('GaiaFastList >>', function() {
           var items = Array.from(el.querySelectorAll('.gfl-item'));
           items.forEach((item, i) => {
             var firstInSection = i % 10 === 0;
-            var borderTopStyle = getComputedStyle(item).borderTopStyle;
-            var expected = firstInSection
-              ? 'none'
-              : 'solid';
+            var borderTopStyle = getComputedStyle(item).borderTopColor;
 
-            assert.equal(borderTopStyle, expected);
+            if (firstInSection) assert.equal(borderTopStyle, 'transparent');
+            else assert.notEqual(borderTopStyle, 'transparent');
           });
         });
     });
@@ -296,12 +294,10 @@ suite('GaiaFastList >>', function() {
           var items = Array.from(el.querySelectorAll('.gfl-item'));
           items.forEach((item, i) => {
             var firstInSection = i === 0;
-            var borderTopStyle = getComputedStyle(item).borderTopStyle;
-            var expected = firstInSection
-              ? 'none'
-              : 'solid';
+            var borderTopStyle = getComputedStyle(item).borderTopColor;
 
-            assert.equal(borderTopStyle, expected);
+            if (firstInSection) assert.equal(borderTopStyle, 'transparent');
+            else assert.notEqual(borderTopStyle, 'transparent');
           });
         });
     });
