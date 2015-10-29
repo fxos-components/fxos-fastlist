@@ -595,7 +595,7 @@ Internal.prototype = {
   sectionize(items) {
     debug('sectionize');
     var sectioned = !!this.getSectionName;
-    var hasSections = false;
+    var count = 0;
     var result = {};
 
     for (var i = 0, l = items.length; i < l; i++) {
@@ -625,11 +625,11 @@ Internal.prototype = {
       }
 
       result[section].push(item);
-      hasSections = true;
+      count++;
     }
 
-    this.hasSections = hasSections;
-    return sectioned && result;
+    this.hasSections = !!count;
+    return this.hasSections && result;
   },
 
   /**
