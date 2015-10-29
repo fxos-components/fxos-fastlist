@@ -1081,6 +1081,25 @@ suite('GaiaFastList >>', function() {
     });
   });
 
+  suite('getSectionName()', function() {
+    test('renders correctly when `undefined` returned as section', function() {
+      var listCreated = afterNext(InternalProto, 'createList');
+
+      var el = createList();
+      el.configure({ getSectionName: () => undefined });
+      el.model = createModel();
+
+      return listCreated
+        .then(() => {
+          var els = Array.from(el.querySelectorAll('.gfl-item'));
+          els.forEach((el, i) => {
+            var y = el.getBoundingClientRect().top;
+            assert.equal(y, i * 60);
+          });
+        });
+    });
+  });
+
   /**
    * Utils
    */
