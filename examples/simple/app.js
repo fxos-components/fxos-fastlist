@@ -1,6 +1,6 @@
 
 var list = document.querySelector('gaia-fast-list');
-list.model = getData();
+list.setModel(getData());
 
 function getData() {
   var result = [];

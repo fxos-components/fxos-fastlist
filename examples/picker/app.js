@@ -5,7 +5,7 @@ list.configure({
   getSectionName(item) { return item.section; }
 });
 
-list.model = getData();
+list.setModel(getData());
 
 function getData() {
   var result = [];
