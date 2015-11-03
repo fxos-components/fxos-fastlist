@@ -140,6 +140,16 @@ var GaiaFastListProto = {
   },
 
   /**
+   * Smooth scrolls to the given position.
+   *
+   * @param  {Number} y
+   * @return {Promise}
+   */
+  scrollTo(y) {
+    return this[keys.internal].scrollTo(y);
+  },
+
+  /**
    * Permanently destroy the component.
    *
    * @public
@@ -1252,6 +1262,23 @@ Internal.prototype = {
       this.els.list.style.transform = `translateY(${-value}px)`;
       this.initialScrollTop = value;
     }
+  },
+
+  /**
+   * Scroll smoothly to a position.
+   *
+   * @param  {Number} y
+   */
+  scrollTo(y) {
+    return this.listCreated
+      .then(() => {
+        debug('scroll to', y);
+        this.els.container.scrollTo({
+          left: 0,
+          top: y,
+          behavior: 'smooth'
+        });
+      });
   },
 
   /**

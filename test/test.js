@@ -1100,6 +1100,35 @@ suite('GaiaFastList >>', function() {
     });
   });
 
+  suite('GaiaFastList#scrollTo()', function() {
+    var el;
+
+    setup(function() {
+      el = createList();
+      el.model = createModel();
+    });
+
+    test('it scrolls smoothly to the given y position', function() {
+      var positions = [];
+
+      return el.scrollTo(500)
+        .then(() => {
+          return new Promise(resolve => {
+            (function check() {
+              positions.push(el.scrollTop);
+              if (el.scrollTop < 500) setTimeout(check, 100);
+              else resolve();
+            })();
+          });
+        })
+
+        .then(() => {
+          assert.isTrue(positions.length > 2, 'it scrolled in increments');
+          assert.equal(el.scrollTop, 500, 'it reached the given position');
+        });
+    });
+  });
+
   /**
    * Utils
    */
