@@ -1426,10 +1426,15 @@ Internal.prototype = {
   updateCache() {
     if (!this.el.caching) return Promise.resolve();
     debug('update cache');
+
     var fullHeight = this.getFullHeight();
     var maxViewportHeight = Math.max(window.innerWidth, window.innerHeight);
     var length = Math.ceil(maxViewportHeight / this.getItemHeight());
+    var fullLength = this.getFullLength();
     var html = '';
+
+    // Don't attempt to cache more items than we have.
+    if (length > fullLength) length = fullLength;
 
     for (var i = 0; i < length; i++) {
       var el = this.createItem();
@@ -1453,7 +1458,6 @@ Internal.prototype = {
       height: fullHeight,
       html: html
     });
-
   },
 
   /**
