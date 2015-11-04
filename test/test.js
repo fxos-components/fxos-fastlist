@@ -1,12 +1,11 @@
 /* global suite, sinon, setup, teardown,
-test, assert, GaiaFastList, FastList */
+test, assert, GaiaFastList */
 
 /*jshint maxlen:false*/
 
 suite('GaiaFastList >>', function() {
   'use strict';
   var GaiaFastListProto = GaiaFastList.prototype;
-  var InternalProto = GaiaFastList.Internal.prototype;
   var utils = window['test-utils'];
   var afterNext = utils.afterNext;
   var dom;
@@ -28,29 +27,25 @@ suite('GaiaFastList >>', function() {
 
   test('it creates FastList when model is first set', function() {
     var el = createList();
-    var listCreated = afterNext(InternalProto, 'createList');
-
     sinon.assert.notCalled(this.FastList);
-    el.model = createModel();
 
-    return listCreated.then(() => {
-      sinon.assert.calledOnce(this.FastList);
-    });
+    return el.setModel(createModel())
+      .then(() => {
+        sinon.assert.calledOnce(this.FastList);
+      });
   });
 
   suite('offset >>', function() {
     test('it offsets all list items by the offset value', function() {
       var el = createList('offset="100"');
+      var model = createModel();
 
       // Append foreign element
       var before = document.createElement('div');
       before.style.height = '100px';
       el.appendChild(before);
 
-      var listCreated = afterNext(InternalProto, 'createList');
-      el.model = createModel();
-
-      return listCreated.then(() => {
+      return el.setModel(model).then(() => {
         var items = el.querySelectorAll('li');
         assert.equal(items[0].getBoundingClientRect().top, 100);
         assert.equal(items[1].getBoundingClientRect().top, 160);
@@ -60,6 +55,7 @@ suite('GaiaFastList >>', function() {
 
     test('it offsets sections as well as items', function() {
       var el = createList('offset="100"');
+      var model = createModel();
 
       // Append foreign element
       var before = document.createElement('div');
@@ -69,10 +65,7 @@ suite('GaiaFastList >>', function() {
       // create a single section
       el.configure({ getSectionName() { return 'section'; } });
 
-      var listCreated = afterNext(InternalProto, 'createList');
-      el.model = createModel();
-
-      listCreated.then(() => {
+      return el.setModel(model).then(() => {
         var sections = el.querySelectorAll('.gfl-section');
         var items = el.querySelectorAll('.gfl-item');
 
@@ -90,17 +83,14 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it should cache the content of the first render', function() {
-      var afterSetCache = afterNext(InternalProto, 'setCache');
       this.el = createList('caching');
-      this.el.model = createModel();
-      this.el.cache();
+      this.el.setModel(createModel());
 
-      return afterSetCache
+      return this.el.cache()
         .then(() => {
           this.el.remove();
-          var promise = afterNext(InternalProto, 'renderCache');
           this.el = createList('caching');
-          return promise;
+          return this.el.rendered;
         })
 
         .then(() => {
@@ -116,20 +106,25 @@ suite('GaiaFastList >>', function() {
     test('it replaces the cache when the model is first set', function() {
       this.el = createList('caching');
 
+      var model = createModel();
+      var first = model[0];
+
+      // trigger render
+      this.el.setModel(model);
+
       // trigger creation of first cache
-      this.el.model = createModel();
-      this.el.cache();
+      return this.el.cache()
+        .then(() => {
 
-      var first = this.el.model[0];
+          // destroy first component
+          this.el.remove();
 
-      // destroy first component
-      this.el.remove();
+          // Create new component
+          this.el = createList('caching');
 
-      // Create new component
-      var promise = afterNext(InternalProto, 'renderCache');
-      this.el = createList('caching');
+          return this.el.rendered;
+        })
 
-      promise
         .then(() => {
 
           // assert contains first cached model
@@ -137,18 +132,20 @@ suite('GaiaFastList >>', function() {
           assert.equal(firstTitle.textContent, first.title, 'first item matches first model');
 
           // set a different model
-          this.el.model = createModel().slice(5);
-          first = this.el.model[0];
-          this.el.cache();
+          var model = createModel().slice(5);
+          this.el.setModel(model);
+          first = model[0];
+          return this.el.cache();
+        })
+
+        .then(() => {
 
           // destroy second component
           this.el.remove();
 
-          var promise = afterNext(InternalProto, 'renderCache');
-
           // create third component
           this.el = createList('caching');
-          return promise;
+          return this.el.rendered;
         })
 
         .then(() => {
@@ -161,16 +158,15 @@ suite('GaiaFastList >>', function() {
 
     test('it only caches enough list-items to fill the viewport', function() {
       this.el = createList('caching');
-      this.el.model = createModel();
-      this.el.cache();
+      this.el.setModel(createModel());
 
-      this.el.remove();
+      return this.el.cache()
+        .then(() => {
+          this.el.remove();
+          this.el = createList('caching');
+          return this.el.rendered;
+        })
 
-      // Create new list
-      var promise = afterNext(InternalProto, 'renderCache');
-      this.el = createList('caching');
-
-      promise
         .then(() => {
           var items = this.el.querySelectorAll('.gfl-item');
           var itemHeight = 60;
@@ -183,40 +179,35 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it caches the final height once .cache() is called', function() {
+      var model = createModel({ length: 10 });
       var itemHeight = 60;
 
-      var listCreated = afterNext(InternalProto, 'createList');
       this.el = createList('caching');
-      this.el.model = createModel({ length: 10 });
 
-      return listCreated
+      return this.el.setModel(model)
         .then(() => {
-          var dataReloaded = afterNext(InternalProto, 'reloadData');
-          this.el.model = this.el.model.concat(createModel({ length: 10 }));
-          return dataReloaded;
+          model = model.concat(createModel({ length: 10 }));
+          return this.el.setModel(model);
         })
 
         .then(() => {
-          var dataReloaded = afterNext(InternalProto, 'reloadData');
-          this.el.model = this.el.model.concat(createModel({ length: 10 }));
-          return dataReloaded;
+          model = model.concat(createModel({ length: 10 }));
+          return this.el.setModel(model);
         })
 
         .then(() => {
-          this.el.model = this.el.model.concat(createModel({ length: 10 }));
-          var afterSetCache = afterNext(InternalProto, 'setCache');
-          this.el.cache();
-          return afterSetCache;
+          model = model.concat(createModel({ length: 10 }));
+          return this.el.setModel(model);
+        })
+
+        .then(() => {
+          return this.el.cache();
         })
 
         .then(() => {
           this.el.remove();
-
-          // Create new list
-          var afterInjected = afterNext(InternalProto, 'renderCache');
           this.el = createList('caching');
-          this.el.model = createModel({ length: 10 });
-          return afterInjected;
+          return this.el.setModel(createModel({ length: 10 }));
         })
 
         .then(() => {
@@ -228,49 +219,54 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it updates the height when the new height is different from cached', function() {
+      var model = createModel({ length: 10 });
       var itemHeight = 60;
-      var listCreated = afterNext(InternalProto, 'createList');
+
       this.el = createList('caching');
-      this.el.model = createModel({ length: 10 });
 
-      return listCreated
+      return this.el.setModel(model)
         .then(() => {
-        var dataReloaded = afterNext(InternalProto, 'reloadData');
-        this.el.model = this.el.model.concat(createModel({ length: 10 }));
-        return dataReloaded;
-      }).then(() => {
-        var cacheSet = afterNext(InternalProto, 'setCache');
-        this.el.model = this.el.model.concat(createModel({ length: 10 }));
-        this.el.cache();
-        return cacheSet;
-      }).then(() => {
-        this.el.remove();
+          model = model.concat(createModel({ length: 10 }));
+          return this.el.setModel(model);
+        })
 
-        var listCreated = afterNext(InternalProto, 'createList');
-        this.el = createList('caching');
-        this.el.model = createModel({ length: 10 });
-        return listCreated;
-      }).then(() => {
-        var cacheSet = afterNext(InternalProto, 'setCache');
-        this.el.model = this.el.model.concat(createModel({ length: 10 }));
-        this.el.cache();
-        return cacheSet;
-      }).then(() => {
-        var list = this.el.shadowRoot.querySelector('ul');
-        assert.equal(list.clientHeight, 20 * itemHeight);
-      });
+        .then(() => {
+          model = model.concat(createModel({ length: 10 }));
+          return this.el.setModel(model);
+        })
+
+        .then(() => {
+          return this.el.cache();
+        })
+
+        .then(() => {
+          this.el.remove();
+          this.el = createList('caching');
+          model = createModel({ length: 10 });
+          return this.el.setModel(model);
+        })
+
+        .then(() => {
+          model = model.concat(createModel({ length: 10 }));
+          this.el.setModel(model);
+          return this.el.cache();
+        })
+
+        .then(() => {
+          var list = this.el.shadowRoot.querySelector('ul');
+          assert.equal(list.clientHeight, 20 * itemHeight);
+        });
     });
   });
 
   suite('styling >>', function() {
     test('it does not put top-borders on the first item in a section', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
+      var model = createModel({ perSection: 10 });
       var el = createList();
 
       el.configure({ getSectionName(item) { return item.section; } });
-      el.model = createModel({ perSection: 10 });
 
-      return listCreated
+      return el.setModel(model)
         .then(() => {
           var items = Array.from(el.querySelectorAll('.gfl-item'));
           items.forEach((item, i) => {
@@ -284,12 +280,11 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it does not put border-top on first item when there are no sections', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
+      var model = createModel();
       var el = createList();
 
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(model)
         .then(() => {
           var items = Array.from(el.querySelectorAll('.gfl-item'));
           items.forEach((item, i) => {
@@ -300,14 +295,6 @@ suite('GaiaFastList >>', function() {
             else assert.notEqual(borderTopStyle, 'transparent');
           });
         });
-    });
-
-    test('when created with no cache a placeholder background is displayed', function() {
-      var el = createList();
-      var container = el.shadowRoot.querySelector('.fast-list');
-      var background = getComputedStyle(container).backgroundImage;
-
-      assert.ok(background, 'background-image defined');
     });
   });
 
@@ -342,28 +329,23 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it does not cause sync reflow when `top` and `bottom` attributes are used', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       var el = createList('top=50 bottom=0');
       var inner = el.shadowRoot.querySelector('.inner');
 
       inner.style.height = '400px';
       el.style.height = '';
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           sinon.assert.notCalled(spy);
 
-          var listCreated = afterNext(InternalProto, 'createList');
           var el = createList();
           var inner = el.shadowRoot.querySelector('.inner');
 
           inner.style.height = '400px';
           el.style.height = '';
-          el.model = createModel();
 
-          return listCreated;
+          return el.setModel(createModel());
         })
 
         .then(() => {
@@ -372,23 +354,18 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it does not cause reflow when list.style.height is set', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       var el = createList('top=50 bottom=0');
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           sinon.assert.notCalled(spy);
 
-          var listCreated = afterNext(InternalProto, 'createList');
           var el = createList();
           var inner = el.shadowRoot.querySelector('.inner');
 
           inner.style.height = '400px';
           el.style.height = '';
-          el.model = createModel();
-          return listCreated;
+          return el.setModel(createModel());
         })
 
         .then(() => {
@@ -409,14 +386,12 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it jumps to a section when tapped', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList('picker');
       var picker = el.shadowRoot.querySelector('.picker');
 
       el.configure({ getSectionName(item) { return item.section; } });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var x = picker.clientWidth / 2;
           var sectionB = el.querySelector('#gfl-section-b');
@@ -429,15 +404,13 @@ suite('GaiaFastList >>', function() {
     });
 
     test('the picker overlay displays the letter of the pressed picker-item', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList('picker');
       var picker = el.shadowRoot.querySelector('.picker');
       var overlayText = el.shadowRoot.querySelector('.overlay > .text');
 
       el.configure({ getSectionName(item) { return item.section; } });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var x = picker.clientWidth / 2;
           var pickerItemHeight = picker.querySelector('a').offsetHeight;
@@ -465,7 +438,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it accepts user provided picker items', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList('picker');
 
       var customPickerItem = document.createElement('a');
@@ -477,9 +449,8 @@ suite('GaiaFastList >>', function() {
       el.appendChild(customPickerItem);
 
       el.configure({ getSectionName(item) { return item.section; } });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var sectionD = el.querySelector('#gfl-section-d');
 
@@ -491,7 +462,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it populates overlay icon if picker-item is an icon', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList('picker');
       var overlayIcon = el.shadowRoot.querySelector('.overlay > .icon');
 
@@ -501,9 +471,7 @@ suite('GaiaFastList >>', function() {
       el.appendChild(customPickerItem);
 
       el.configure({ getSectionName(item) { return item.section; } });
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           utils.touch(customPickerItem, 'touchstart');
           utils.touch(customPickerItem, 'touchend');
@@ -517,8 +485,6 @@ suite('GaiaFastList >>', function() {
     var el;
 
     test('it loads images', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       el = createList();
       el.configure({
         getItemImageSrc(item, i) {
@@ -526,9 +492,7 @@ suite('GaiaFastList >>', function() {
         }
       });
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           return Promise.all([].map.call(el.querySelectorAll('img'), img => {
             return new Promise(resolve => img.addEventListener('load', resolve));
@@ -537,8 +501,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it loads correct images when the scrollTop changes', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       el = createList();
       el.configure({
         getItemImageSrc(item, i) {
@@ -546,9 +508,7 @@ suite('GaiaFastList >>', function() {
         }
       });
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var itemHeight = 60;
           el.scrollTop = 55 * itemHeight;
@@ -567,8 +527,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it keeps the image hidden if no src is returned', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       el = createList();
       el.configure({
         getItemImageSrc(item, i) {
@@ -578,9 +536,7 @@ suite('GaiaFastList >>', function() {
         }
       });
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var items = el.querySelectorAll('.gfl-item');
           return [].map.call(items, item => {
@@ -597,8 +553,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('getImageSrc() can return a Promise', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       el = createList();
       el.configure({
         getItemImageSrc(item, i) {
@@ -610,9 +564,7 @@ suite('GaiaFastList >>', function() {
         }
       });
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           return Promise.all([].map.call(el.querySelectorAll('img'), (img, index) => {
             return new Promise(resolve => img.addEventListener('load', e => {
@@ -625,7 +577,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('getItemImageSrc() can return a Blob', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList();
       el.configure({
         getItemImageSrc(item, i) {
@@ -633,9 +584,7 @@ suite('GaiaFastList >>', function() {
         }
       });
 
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           return Promise.all([].map.call(el.querySelectorAll('img'), (img, index) => {
             return new Promise(resolve => img.addEventListener('load', e => {
@@ -647,7 +596,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('getItemImageSrc() is only called once per item', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList();
 
       var getItemImageSrc = sinon.spy((item, i) => {
@@ -655,11 +603,8 @@ suite('GaiaFastList >>', function() {
       });
 
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => imagesLoaded(el))
-
         .then(() => {
 
           // scroll down
@@ -682,8 +627,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('cached images get deleted when `imageCacheSize` limit is reached', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       this.sinon.spy(URL, 'revokeObjectURL');
 
       el = createList();
@@ -696,9 +639,8 @@ suite('GaiaFastList >>', function() {
       });
 
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => imagesLoaded(el))
         .then(() => {
           el.scrollTop = 400 * 4; // 4 viewports
@@ -712,7 +654,6 @@ suite('GaiaFastList >>', function() {
     test('cached images get discarded when `imageCacheLength` limit is reached', function() {
       this.sinon.spy(URL, 'revokeObjectURL');
 
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList();
 
       // set size small so limit reached easily
@@ -723,9 +664,8 @@ suite('GaiaFastList >>', function() {
       });
 
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => imagesLoaded(el))
         .then(() => {
           el.scrollTop += 400 * 4; // 4 viewports
@@ -743,7 +683,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('setting a new model does not load cached images', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList();
 
       var getItemImageSrc = sinon.spy((item, i) => {
@@ -751,9 +690,8 @@ suite('GaiaFastList >>', function() {
       });
 
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = [{ image: 1 }];
 
-      return listCreated
+      return el.setModel([{ image: 1 }])
         .then(() => imagesLoaded(el))
         .then(() => {
           var firstImage = el.querySelector('img');
@@ -761,7 +699,7 @@ suite('GaiaFastList >>', function() {
         })
 
         .then(() => {
-          el.model = [{ image: 2 }];
+          el.setModel([{ image: 2 }]);
           return new Promise(resolve => {
             var firstImage = el.querySelector('img');
             firstImage.addEventListener('load', function f() {
@@ -774,7 +712,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('all ObjectURLs should be revoked when page is destroyed', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       var blobs = [];
 
       this.sinon.spy(URL, 'createObjectURL');
@@ -792,13 +729,13 @@ suite('GaiaFastList >>', function() {
 
       el.configure({ getItemImageSrc: getItemImageSrc });
 
-      el.model = [
+      var model = [
         { image: 1 },
         { image: 2 },
         { image: 3 },
       ];
 
-      return listCreated
+      return el.setModel(model)
         .then(() => imagesLoaded(el))
         .then(() => {
           sinon.assert.calledWith(URL.createObjectURL, blobs[0]);
@@ -817,8 +754,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it does not use the cache if the imageCacheSize is falsy', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       el = createList();
 
       // turn cache off
@@ -829,9 +764,8 @@ suite('GaiaFastList >>', function() {
       });
 
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => imagesLoaded(el))
         .then(() => {
           var firstCallArgs = getItemImageSrc.args[0];
@@ -854,7 +788,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it can handle imageCacheLength being < itemCount', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       el = createList();
 
       // silly configuration
@@ -865,24 +798,22 @@ suite('GaiaFastList >>', function() {
       });
 
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
 
-      return listCreated.then(() => imagesLoaded(el));
+      return el.setModel(createModel())
+        .then(() => imagesLoaded(el));
     });
 
     test('it cancels rAF if unpopulateItemDetail runs before frame', function() {
       var raf = this.sinon.spy(window, 'requestAnimationFrame');
       var caf = this.sinon.spy(window, 'cancelAnimationFrame');
-      var listCreated = afterNext(InternalProto, 'createList');
       var getItemImageSrc = sinon.spy((item, i) => {
         return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
       });
 
       el = createList();
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => afterNext(window, 'requestAnimationFrame'))
         .then(() => {
           var rafId = raf.lastCall.returnValue;
@@ -892,7 +823,6 @@ suite('GaiaFastList >>', function() {
     });
 
     test('it cancels image.onload if unpopulateItemDetail runs before load', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       var getItemImageSrc = sinon.spy((item, i) => {
         return getBlobFromURL(`/base/test/lib/artwork-${i % 10}.jpg`);
       });
@@ -902,9 +832,8 @@ suite('GaiaFastList >>', function() {
 
       el = createList();
       el.configure({ getItemImageSrc: getItemImageSrc });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           return new Promise(resolve => {
             images = el.querySelectorAll('img');
@@ -941,7 +870,6 @@ suite('GaiaFastList >>', function() {
   suite('scrollTop >>', function() {
     test('setting `scrollTop` before render will instantly adjust the list offset', function() {
       var el = createList();
-
       el.scrollTop = 50;
 
       var list = el.shadowRoot.querySelector('ul');
@@ -949,13 +877,10 @@ suite('GaiaFastList >>', function() {
     });
 
     test('once rendered the scrollTop is set on the container', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       var el = createList();
-
       el.scrollTop = 50;
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var container = el.shadowRoot.querySelector('.fast-list');
           var list = el.shadowRoot.querySelector('ul');
@@ -967,129 +892,109 @@ suite('GaiaFastList >>', function() {
 
     test('should return the set value before render', function() {
       var el = createList();
-
       el.scrollTop = 50;
       assert.equal(el.scrollTop, 50);
     });
 
     test('should return the set value after render', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
       var el = createList();
 
       el.scrollTop = 50;
-
-      // trigger render
-      el.model = createModel();
-
-      return listCreated
+      return el.setModel(createModel())
         .then(() => assert.equal(el.scrollTop, 50));
     });
   });
 
-  suite('\'rendered\' event >>', function() {
-    test('it fires when a cache in rendered', function(done) {
-      var afterSetCache = afterNext(InternalProto, 'setCache');
+  suite('\'rendered\' Promise >>', function() {
+    test('it resolves when the cache is rendered', function() {
       var el = createList('caching');
 
-      el.model = createModel();
-      el.cache();
+      el.setModel(createModel());
 
-      afterSetCache
+      return el.cache()
         .then(() => {
           el.remove();
           el = createList('caching');
-          el.addEventListener('rendered', () => {
-            var cache = el.querySelector('.cached');
-            assert.ok(cache);
-            done();
-          });
+          return el.rendered;
+        })
+
+        .then(() => {
+          var cache = el.querySelector('.cached');
+          assert.ok(cache);
         });
     });
 
-    test('without cache it fires when fast-list\'s critical render has completed', function(done) {
+    test('without cache it fires when fast-list\'s critical render has completed', function() {
       var el = createList();
-      el.model = createModel();
 
-      el.addEventListener('rendered', function() {
-        var items = el.querySelectorAll('.gfl-item');
-        var cache = el.querySelector('.cached');
+      el.setModel(createModel());
 
-        assert.isNull(cache, 'no cache render');
-        assert.equal(items.length, 7, 'critical items only');
-        done();
-      });
+      return el.rendered
+        .then(() => {
+          var items = el.querySelectorAll('.gfl-item');
+          var cache = el.querySelector('.cached');
+
+          assert.isNull(cache, 'no cache render');
+          assert.equal(items.length, 7, 'critical items only');
+        });
     });
   });
 
   suite('fast gradient >>', function() {
-    test('it\'s added only after FastList setup is complete', function(done) {
+    test('it\'s added only after FastList setup is complete', function() {
       var el = createList();
-      el.model = createModel();
+      var complete = el.setModel(createModel());
 
-      el.addEventListener('rendered', () => {
-        var fastList = this.FastList.lastCall.returnValue;
-        var list = el.shadowRoot.querySelector('ul');
-        var backgroundImage = getComputedStyle(list).backgroundImage;
+      el.rendered
+        .then(() => {
+          var list = el.shadowRoot.querySelector('ul');
+          var backgroundImage = getComputedStyle(list).backgroundImage;
 
-        // Should not be present on first render
-        assert.equal(backgroundImage, 'none');
+          // Should not be present on first render
+          assert.equal(backgroundImage, 'none');
 
-        // Wait until FastList fully setup
-        fastList.complete.then(() => {
-          setTimeout(() => {
+          // Wait until FastList fully setup
+          return complete;
+        })
+
+        .then(() => {
+            var list = el.shadowRoot.querySelector('ul');
             var backgroundImage = getComputedStyle(list).backgroundImage;
             assert.include(backgroundImage, 'linear-gradient');
-            done();
-          });
         });
-      });
     });
 
-    test('it\'s not applied when full-height is shorter than viewport', function(done) {
+    test('it\'s not applied when full-height is shorter than viewport', function() {
+      var smallModel = createModel().slice(0, 5);
       var el = createList();
-      el.model = createModel().slice(0, 5);
 
-      el.addEventListener('rendered', () => {
-        var fastList = this.FastList.lastCall.returnValue;
-        fastList.complete.then(() => {
-          setTimeout(() => {
-            var list = el.shadowRoot.querySelector('ul');
-            var backgroundImage = getComputedStyle(list).backgroundImage;
-            assert.equal(backgroundImage, 'none');
-            done();
-          });
+      return el.setModel(smallModel)
+        .then(() => {
+          var list = el.shadowRoot.querySelector('ul');
+          var backgroundImage = getComputedStyle(list).backgroundImage;
+          assert.equal(backgroundImage, 'none');
         });
-      });
     });
 
-    test('a second blocking gradient is applied to cover offset region', function(done) {
+    test('a second blocking gradient is applied to cover offset region', function() {
       var offset = '99';
       var el = createList(`offset=${offset}`);
-      el.model = createModel();
 
-      el.addEventListener('rendered', () => {
-        var fastList = this.FastList.lastCall.returnValue;
-        fastList.complete.then(() => {
-          setTimeout(() => {
-            var list = el.shadowRoot.querySelector('ul');
-            var backgroundSize = getComputedStyle(list).backgroundSize;
-            assert.include(backgroundSize, `100% ${offset}`);
-            done();
-          });
+      return el.setModel(createModel())
+        .then(() => {
+          var list = el.shadowRoot.querySelector('ul');
+          var backgroundSize = getComputedStyle(list).backgroundSize;
+          assert.include(backgroundSize, `100% ${offset}`);
         });
-      });
     });
   });
 
   suite('getSectionName()', function() {
     test('renders correctly when `undefined` returned as section', function() {
-      var listCreated = afterNext(InternalProto, 'createList');
-
       var el = createList();
       el.configure({ getSectionName: () => undefined });
-      el.model = createModel();
 
-      return listCreated
+      return el.setModel(createModel())
         .then(() => {
           var els = Array.from(el.querySelectorAll('.gfl-item'));
           els.forEach((el, i) => {
@@ -1105,7 +1010,7 @@ suite('GaiaFastList >>', function() {
 
     setup(function() {
       el = createList();
-      el.model = createModel();
+      el.setModel(createModel());
     });
 
     test('it scrolls smoothly to the given y position', function() {

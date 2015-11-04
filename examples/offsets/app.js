@@ -3,7 +3,7 @@ var list = document.querySelector('gaia-fast-list');
 
 list.scrollTop = 50;
 list.minScrollHeight = 'calc(100% + 50px)';
-list.model = getData();
+list.setModel(getData());
 
 function getData() {
   var result = [];

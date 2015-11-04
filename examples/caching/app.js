@@ -8,21 +8,19 @@ list.configure({
   getSectionName: item => item.date
 });
 
-list.addEventListener('rendered', function fn(argument) {
-  list.removeEventListener('rendered', fn);
-  document.body.hidden = false;
-});
+list.rendered.then(() => document.body.hidden = false);
 
 var chunkSize = 100;
 var total = 350;
 var count = 0;
+var model = [];
 
 function loadNext() {
   getDataAsync(count, chunkSize).then(data => {
     debug('got data', data);
 
-    var model = list.model || [];
-    list.model = model.concat(data);
+    model = model.concat(data);
+    list.setModel(model);
 
     count += chunkSize;
     if (count >= total) {
