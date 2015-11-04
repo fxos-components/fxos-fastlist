@@ -1264,16 +1264,22 @@ Internal.prototype = {
   /**
    * Scroll smoothly to a position.
    *
+   * In certain circumstances .scrollTo()
+   * is ignored by Gecko. Wrapping it in
+   * setTimeout() seems to fix this :/
+   *
    * @param  {Number} y
    */
   scrollTo(y) {
     return this.listCreated.promise
       .then(() => {
-        debug('scroll to', y);
-        this.els.container.scrollTo({
-          left: 0,
-          top: y,
-          behavior: 'smooth'
+        setTimeout(() => {
+          debug('scroll to', y);
+          this.els.container.scrollTo({
+            left: 0,
+            top: y,
+            behavior: 'smooth'
+          });
         });
       });
   },
