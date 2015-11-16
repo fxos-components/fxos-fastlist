@@ -128,7 +128,7 @@ suite('GaiaFastList >>', function() {
         .then(() => {
 
           // assert contains first cached model
-          var firstTitle = this.el.querySelectorAll('.gfl-item h2')[0];
+          var firstTitle = this.el.querySelectorAll('.gfl-item h3')[0];
           assert.equal(firstTitle.textContent, first.title, 'first item matches first model');
 
           // set a different model
@@ -151,7 +151,7 @@ suite('GaiaFastList >>', function() {
         .then(() => {
 
           // assert contains second cached model
-          var firstTitle = this.el.querySelectorAll('.gfl-item h2')[0];
+          var firstTitle = this.el.querySelectorAll('.gfl-item h3')[0];
           assert.equal(firstTitle.textContent, first.title, 'first item matches first model');
         });
     });
@@ -989,7 +989,7 @@ suite('GaiaFastList >>', function() {
     });
   });
 
-  suite('getSectionName()', function() {
+  suite('getSectionName() >>', function() {
     test('renders correctly when `undefined` returned as section', function() {
       var el = createList();
       el.configure({ getSectionName: () => undefined });
@@ -1005,7 +1005,7 @@ suite('GaiaFastList >>', function() {
     });
   });
 
-  suite('GaiaFastList#scrollTo()', function() {
+  suite('GaiaFastList#scrollTo() >>', function() {
     var el;
 
     setup(function() {
@@ -1034,6 +1034,42 @@ suite('GaiaFastList >>', function() {
     });
   });
 
+  suite('RTL >>', function() {
+    var documentDir = document.dir;
+    var el;
+
+    setup(function() {
+      el = createList();
+      return el.setModel(createModel());
+    });
+
+    teardown(function() {
+      document.dir = documentDir;
+    });
+
+    test('it pads the text away from the image in RTL & LTR', function() {
+      var item = el.querySelector('.gfl-item');
+      var image = item.querySelector('.image');
+      var title = item.querySelector('h3');
+      var body = item.querySelector('p');
+
+      var imageWidth = image.clientWidth;
+      var titlePadding = parseInt(getComputedStyle(title).paddingRight);
+      var bodyPadding = parseInt(getComputedStyle(body).paddingRight);
+
+      assert.equal(titlePadding, bodyPadding);
+      assert.isTrue(titlePadding > imageWidth);
+
+      document.dir = 'rtl';
+
+      titlePadding = parseInt(getComputedStyle(title).paddingLeft);
+      bodyPadding = parseInt(getComputedStyle(body).paddingLeft);
+
+      assert.equal(titlePadding, bodyPadding);
+      assert.isTrue(titlePadding > imageWidth);
+    });
+  });
+
   /**
    * Utils
    */
@@ -1044,9 +1080,9 @@ suite('GaiaFastList >>', function() {
     var html = '<gaia-fast-list ' + attrs + '>'
       +    '<template>'
       +      '<li>'
-      +        '<h2>${title}</h2>'
-      +        '<p>${body}</p>'
       +        '<div class="image"><img/></div>'
+      +        '<h3 dir="auto">${title}</h3>'
+      +        '<p dir="auto">${body}</p>'
       +      '</li>'
       +    '</template>'
       + '</gaia-fast-list>';

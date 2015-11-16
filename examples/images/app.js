@@ -15,8 +15,8 @@ function getData() {
     for (var i = 0; i < letters.length; i++) {
       for (var j = 0; j < 50; j++) {
         result.push({
-          title: `Title ${j}`,
-          body: `Body ${j}`,
+          title: `Title Title Title Title Title (${j})`,
+          body: `Body (${j})`,
           section: letters[i]
         });
       }
