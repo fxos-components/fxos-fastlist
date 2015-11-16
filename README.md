@@ -23,12 +23,12 @@ $ bower install gaia-components/gaia-fast-list
 var list = document.querySelector('gaia-fast-list');
 
 // triggers render
-list.model = [
+list.setModel([
   { title: 'Title 1', body: 'Body 1' },
   { title: 'Title 2', body: 'Body 2' },
   { title: 'Title 3', body: 'Body 3' },
   ...
-];
+);
 ```
 
 ## Sections
@@ -42,12 +42,38 @@ list.configure({
   }
 });
 
-list.model = [
+list.setModel([
   { title: 'Title 1', body: 'Body 1', section: 1 },
   { title: 'Title 2', body: 'Body 2', section: 1 },
   { title: 'Title 3', body: 'Body 3', section: 2 },
   ...
 ];
+```
+
+## Images
+
+GaiaFastList takes care of rendering images for you to ensure that scrolling performance remains fast.
+
+Place `<div class="image"><img/></div>` as the *first* child of your list-item template.
+
+```html
+<gaia-fast-list>
+  <template>
+    <li>
+      <div class="image"><img/></div>
+      <h3>${title}</h3>
+      <p>${body}</p>
+    </li>
+  </template>
+</gaia-fast-list>
+```
+
+Then define a `.getItemImageSrc()` function that returns either a `String` or a `Blob`, sync or async (by returning a `Promise`).
+
+```js
+list.configure({
+  getItemImageSrc(item) { return item.src; }
+});
 ```
 
 ## Caching
@@ -63,9 +89,10 @@ The optional caching feature will cache rendered list-items and section HTML in 
 ```
 
 ```js
-// setting the model will
-// replace cached content
-list.model = [...]
+list.setModel([...]);
+
+// update the cached content
+list.cache();
 
 // you can clear caches if need be
 list.clearCache();
