@@ -382,14 +382,24 @@ var GaiaFastListProto = {
         text-overflow: ellipsis;
       }
 
-      ::content .image ~ h3,
-      ::content .image ~ p {
-        padding-inline-end: 60px;
+      ::content :-moz-dir(ltr) .image ~ h3,
+      ::content :-moz-dir(ltr) .image ~ p {
+        padding-right: 52px;
       }
 
-      ::content .image.round ~ h3,
-      ::content .image.round ~ p {
-        padding-inline-end: 42px;
+      ::content :-moz-dir(rtl) .image ~ h3,
+      ::content :-moz-dir(rtl) .image ~ p {
+        padding-left: 52px;
+      }
+
+      ::content :-moz-dir(ltr) .image.round ~ h3,
+      ::content :-moz-dir(ltr) .image.round ~ p {
+        padding-right: 42px;
+      }
+
+      ::content :-moz-dir(rtl) .image.round ~ h3,
+      ::content :-moz-dir(rtl) .image.round ~ p {
+        padding-left: 42px;
       }
 
       ::content h3 {
