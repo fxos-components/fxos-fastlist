@@ -1070,16 +1070,68 @@ suite('GaiaFastList >>', function() {
     });
   });
 
+  suite('unread styling >>', function() {
+    var el;
+
+    setup(function() {
+      var model = [
+        {
+          unread: true,
+          title: 'title 1',
+          body: 'body 1'
+        },
+        {
+          unread: true,
+          title: 'title 2',
+          body: 'body 2'
+        },
+        {
+          unread: false,
+          title: 'title 3',
+          body: 'body 3'
+        }
+      ];
+
+      el = createList('', 'unread=${unread}');
+      return el.setModel(model);
+    });
+
+    test('unread items should be have visible marker', function() {
+      var items = el.querySelectorAll('.gfl-item');
+      assert.equal(getComputedStyle(items[0], ':before').visibility, 'visible');
+      assert.equal(getComputedStyle(items[1], ':before').visibility, 'visible');
+      assert.equal(getComputedStyle(items[2], ':before').visibility, 'hidden');
+    });
+
+    test('all items with `unread` attr should have larger padding-start', function() {
+      var items = el.querySelectorAll('.gfl-item');
+      assert.equal(getComputedStyle(items[0]).paddingLeft, '18px');
+      assert.equal(getComputedStyle(items[1]).paddingLeft, '18px');
+      assert.equal(getComputedStyle(items[2]).paddingLeft, '18px');
+    });
+
+    test('items without `unread` attr should have smaller padding', function() {
+      var el = createList();
+      var model = createModel();
+      return el.setModel(model)
+        .then(() => {
+          var items = el.querySelectorAll('.gfl-item');
+          assert.equal(getComputedStyle(items[0]).paddingLeft, '9px');
+        });
+    });
+  });
+
   /**
    * Utils
    */
 
-  function createList(attrs='') {
+  function createList(attrs='', itemAttrs='') {
     attrs += ' style="width:300px;height:400px;"';
+
 
     var html = '<gaia-fast-list ' + attrs + '>'
       +    '<template>'
-      +      '<li>'
+      +      '<li ' + itemAttrs + '>'
       +        '<div class="image"><img/></div>'
       +        '<h3 dir="auto">${title}</h3>'
       +        '<p dir="auto">${body}</p>'
