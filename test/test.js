@@ -35,6 +35,43 @@ suite('GaiaFastList >>', function() {
       });
   });
 
+  test('it accepts an empty model', function() {
+    var el = createList();
+
+    return el.setModel([])
+      .then(() => {
+        var items = el.querySelectorAll('.gfl-item');
+        assert.equal(items.length, 0);
+        return el.setModel(createModel());
+      })
+
+      .then(() => {
+        var items = el.querySelectorAll('.gfl-item');
+        assert.equal(items.length, 23);
+      });
+  });
+
+  test('setModel() can be hit hard', function(done) {
+    var el = createList();
+
+    el.setModel([]);
+    setTimeout(() => {
+      el.setModel(createModel());
+      el.setModel(createModel().slice(50));
+      setTimeout(() => {
+        var model = createModel().slice(12);
+        el.setModel(model);
+        setTimeout(() => {
+          var items = el.querySelectorAll('.gfl-item');
+          var title = items[0].querySelector('h3').textContent;
+          assert.equal(items.length, 23);
+          assert.equal(title, model[0].title);
+          done();
+        }, 400);
+      }, 100);
+    }, 50);
+  });
+
   suite('offset >>', function() {
     test('it offsets all list items by the offset value', function() {
       var el = createList('offset="100"');
