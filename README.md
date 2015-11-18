@@ -1,4 +1,4 @@
-# &lt;gaia-fast-list&gt; [![](https://travis-ci.org/gaia-components/gaia-fast-list.svg)](https://travis-ci.org/gaia-components/gaia-fast-list)
+[![](https://travis-ci.org/gaia-components/gaia-fast-list.svg)](https://travis-ci.org/gaia-components/gaia-fast-list) [![Coverage Status](https://coveralls.io/repos/gaia-components/gaia-fast-list/badge.svg?branch=master&service=github)](https://coveralls.io/github/gaia-components/gaia-fast-list?branch=master)
 
 ## Installation
 
