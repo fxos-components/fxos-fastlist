@@ -17,7 +17,8 @@ function getData() {
         result.push({
           title: `Title Title Title Title Title (${j})`,
           body: `Body (${j})`,
-          section: letters[i]
+          section: letters[i],
+          unread: Math.random() > 0.5
         });
       }
     }

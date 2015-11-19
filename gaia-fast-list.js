@@ -264,7 +264,6 @@ var GaiaFastListProto = {
     </div>
 
     <style>
-
       :host {
         display: block;
         height: 100%;
@@ -337,6 +336,30 @@ var GaiaFastListProto = {
 
       ::content .gfl-item.first {
         border-top-color: transparent;
+      }
+
+      ::content .gfl-item[unread=true],
+      ::content .gfl-item[unread=false] {
+        -moz-padding-start: 18px;
+      }
+
+      ::content .gfl-item[unread=true]:before,
+      ::content .gfl-item[unread=false]:before {
+        content: '';
+        position: absolute;
+        offset-inline-start: 0;
+        top: 50%;
+
+        display: block;
+        width: 8px;
+        height: 8px;
+        margin-top: -4px;
+        background-color: var(--highlight-color);
+        border-radius: 50%;
+      }
+
+      ::content .gfl-item[unread=false]:before {
+        visibility: hidden;
       }
 
       ::content .image {
