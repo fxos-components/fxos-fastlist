@@ -270,7 +270,7 @@ var GaiaFastListProto = {
 
         color: var(--text-color-minus);
         overflow: hidden;
-        text-align: start;
+        text-align: match-parent;
       }
 
       .inner {
@@ -450,7 +450,7 @@ var GaiaFastListProto = {
 
       [picker] .picker {
         position: absolute;
-        offset-inline-end: 0;
+        right: 0;
         top: 0;
 
         box-sizing: border-box;

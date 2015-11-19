@@ -12,3 +12,11 @@ body {
 
   background: var(--background);
 }
+
+gaia-fast-list {
+  position: absolute;
+  top: 30;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
