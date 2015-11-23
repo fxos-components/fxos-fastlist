@@ -1,7 +1,7 @@
 {
   "name": "gaia-fast-list",
   "main": "gaia-fast-list.js",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "devDependencies": {
     "bower": "^1.5.2",
     "coveralls": "^2.11.4",
