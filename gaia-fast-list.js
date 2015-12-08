@@ -7,7 +7,7 @@
 var component = require('gaia-component');
 var FastList = require('fast-list');
 var scheduler = FastList.scheduler;
-var poplar = require('poplar');
+var popel = require('popel');
 require('gaia-sub-header');
 
 /**
@@ -762,8 +762,8 @@ Internal.prototype = {
    */
   createItem() {
     debug('create item');
-    this.parsedItem = this.parsedItem || poplar.parse(this.templateItem);
-    var el = poplar.create(this.parsedItem.cloneNode(true));
+    this.parsedItem = this.parsedItem || popel.parse(this.templateItem);
+    var el = popel.create(this.parsedItem.cloneNode(true));
     el[keys.img] = el.querySelector('img');
     el.classList.add('gfl-item');
     return el;
@@ -777,9 +777,9 @@ Internal.prototype = {
    */
   createSection(name) {
     this.parsedSection = this.parsedSection
-      || poplar.parse(this.templateHeader);
+      || popel.parse(this.templateHeader);
 
-    var header = poplar.create(this.parsedSection.cloneNode(true));
+    var header = popel.create(this.parsedSection.cloneNode(true));
     var section = document.createElement('div');
 
     header.classList.add('gfl-header');
@@ -794,7 +794,7 @@ Internal.prototype = {
    * Populates a list-item with data.
    *
    * If items were inflated from the HTML cache
-   * they won't yet be poplar elements; in
+   * they won't yet be popel elements; in
    * which case we have to replace them
    * before we can populate them with data.
    *
@@ -803,7 +803,7 @@ Internal.prototype = {
    */
   populateItem(el, i) {
     var record = this.getRecordAt(i);
-    poplar.populate(el, record);
+    popel.populate(el, record);
     el.classList.toggle('first', !!record[keys.first]);
   },
 
@@ -1048,7 +1048,7 @@ Internal.prototype = {
    */
   populateSection(el, section) {
     var title = el.firstChild;
-    poplar.populate(title, { section: section });
+    popel.populate(title, { section: section });
   },
 
   /**
