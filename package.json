@@ -4,7 +4,7 @@
   "browser": "src/fxos-fastlist.js",
   "version": "0.3.2",
   "dependencies": {
-    "fastlist": "^1.0.3",
+    "fastlist": "^1.0.4",
     "fxos-component": "^1.0.0",
     "fxos-sub-header": "^1.0.1",
     "fxos-theme": "^2.0.1",
