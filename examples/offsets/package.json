@@ -3,7 +3,7 @@
   "dependencies": {
     "dom-scheduler": "^2.0.0",
     "fxos-component": "^1.0.0",
-    "fxos-font": "^1.0.0",
+    "fxos-font": "^1.0.1",
     "fxos-theme": "^2.0.1"
   }
 }
