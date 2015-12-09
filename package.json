@@ -2,7 +2,7 @@
   "name": "fxos-fastlist",
   "main": "fxos-fastlist.js",
   "browser": "src/fxos-fastlist.js",
-  "version": "0.3.2",
+  "version": "1.0.0",
   "dependencies": {
     "fastlist": "^1.0.4",
     "fxos-component": "^1.0.0",
