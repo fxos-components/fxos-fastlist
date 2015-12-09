@@ -122,6 +122,20 @@ Sometimes you may require elements other than list-items within your scrollable 
   </template>
 </fxos-fastlist>
 ```
+## Developing locally
+
+1. `git clone https://github.com/fxos-components/fxos-fastlist.git`
+2. `cd fxos-checkbox`
+3. `npm install` (NPM3)
+4. `npm start`
+
+## Readiness
+
+- [ ] Accessibility
+- [ ] Localization
+- [ ] Performance
+- [ ] Visual/UX
+- [ ] RTL
 
 ## Tests
 
