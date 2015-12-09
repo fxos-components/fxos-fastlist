@@ -1,5 +1,5 @@
 
-var list = document.querySelector('gaia-fast-list');
+var list = document.querySelector('fxos-fastlist');
 
 list.configure({
   getSectionName(item) { return item.section; }
@@ -25,4 +25,3 @@ function getData() {
 
   return result;
 }
-

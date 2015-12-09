@@ -1,14 +1,15 @@
-;(function(define){define(function(require,exports,module){
+'use strict';
 
 /**
  * Dependencies
  */
 
-var component = require('gaia-component');
-var FastList = require('fast-list');
+var component = require('fxos-component');
+var FastList = require('fastlist');
 var scheduler = FastList.scheduler;
-var poplar = require('poplar');
-require('gaia-sub-header');
+var popel = require('popel');
+
+require('fxos-sub-header');
 
 /**
  * Pointer abstractions
@@ -25,7 +26,7 @@ var touchend = isTouch ? 'touchend' : 'mouseup';
  *
  * @type {Function}
  */
-var debug = 0 ? (...args) => console.log('[GaiaFastList]', ...args) : () => {};
+var debug = 0 ? (...args) => console.log('[fxos-fastlist]', ...args) : () => {};
 
 /**
  * Cache to persist content.
@@ -55,7 +56,7 @@ var keys = {
  *
  * @type {Object}
  */
-var GaiaFastListProto = {
+var FXOSFastlistProto = {
   extensible: false,
 
   /**
@@ -177,7 +178,7 @@ var GaiaFastListProto = {
 
   /**
    * Public attributes/properties configuration
-   * used by gaia-component.js.
+   * used by fxos-component.js.
    *
    * @type {Object}
    */
@@ -258,7 +259,7 @@ var GaiaFastListProto = {
     <div class="inner">
       <div class="picker"><content select="[picker-item]"></content></div>
       <div class="overlay"><div class="text">X</div><div class="icon">search</div></div>
-      <div class="fast-list">
+      <div class="fastlist">
         <ul><content></content></ul>
       </div>
     </div>
@@ -268,9 +269,11 @@ var GaiaFastListProto = {
         display: block;
         height: 100%;
 
-        color: var(--text-color-minus);
         overflow: hidden;
         text-align: match-parent;
+        color:
+          var(--fxos-fastlist-color,
+          var(--fxos-color));
       }
 
       .inner {
@@ -278,20 +281,22 @@ var GaiaFastListProto = {
         height: 100%;
       }
 
-      .fast-list {
+      .fastlist {
         position: absolute;
-        left: 0; right: 0;
-        top: 0; bottom: 0;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
 
         padding: 0 17px;
       }
 
-      [picker] .fast-list {
+      [picker] .fastlist {
         offset-inline-end: 26px; /* picker width */
         padding-inline-end: 12px;
       }
 
-      .fast-list ul {
+      .fastlist ul {
         position: relative;
 
         padding: 0;
@@ -329,9 +334,14 @@ var GaiaFastListProto = {
 
         list-style-type: none;
         text-decoration: none;
-        border-top: solid 1px var(--border-color, #e7e7e7);
-        background: var(--background);
         -moz-user-select: none;
+        border-top: solid 1px
+          var(--fxos-fastlist-border-color,
+          var(--fxos-border-color,
+          #e7e7e7));
+        background:
+          var(--fxos-fastlist-background,
+          var(--fxos-background));
       }
 
       ::content .gfl-item.first {
@@ -354,8 +364,11 @@ var GaiaFastListProto = {
         width: 8px;
         height: 8px;
         margin-top: -4px;
-        background-color: var(--highlight-color);
         border-radius: 50%;
+        background-color:
+          var(--fxos-fastlist-unread-color,
+          var(--fxos-brand-color,
+          currentColor));
       }
 
       ::content .gfl-item[unread=false]:before {
@@ -381,12 +394,15 @@ var GaiaFastListProto = {
       ::content .gfl-item .image.round {
         top: 8.5px;
         offset-inline-end: 0;
-        background: var(--border-color);
+        background:
+          var(--fxos-fastlist-border-color,
+          var(--fxos-border-color));
       }
 
       ::content .gfl-item img {
         position: absolute;
-        left: 0; top: 0;
+        left: 0;
+        top: 0;
 
         width: 44px;
         height: 44px;
@@ -431,7 +447,9 @@ var GaiaFastListProto = {
         font-size: 20px;
         font-weight: 400;
         font-style: normal;
-        color: var(--text-color);
+        color:
+          var(--fxos-title-color,
+          var(--fxos-color));
       }
 
       ::content p {
@@ -498,7 +516,8 @@ var GaiaFastListProto = {
 
       .overlay {
         position: absolute;
-        left: 50%; top: 50%;
+        left: 50%;
+        top: 50%;
         z-index: 200;
 
         display: none;
@@ -512,12 +531,13 @@ var GaiaFastListProto = {
         font-weight: 300;
         border-radius: 50%;
 
-        color: #fff;
-        background: var(--background-minus);
-        pointer-events: none;
         opacity: 0;
+        pointer-events: none;
         transition: opacity 400ms;
         text-transform: uppercase;
+        background:
+          var(--fxos-fastlist-overlay-background,
+          currentColor);
       }
 
       [picker] .overlay {
@@ -529,10 +549,19 @@ var GaiaFastListProto = {
         transition: opacity 100ms;
       }
 
+      .overlay > .icon,
+      .overlay > .text {
+        color: #fff;
+      }
+
       .overlay > .icon {
         position: absolute;
-        left: 0; top: 0; bottom: 0; right: 0;
-        font-family: "gaia-icons";
+        left: 0;
+        top: 0;
+        bottom: 0;
+        right: 0;
+
+        font-family: "fxos-icons";
         font-weight: 500;
         text-transform: none;
         text-rendering: optimizeLegibility;
@@ -546,7 +575,7 @@ var GaiaFastListProto = {
 
 /**
  * Private internals.
- * @param {GaiaFastList} el
+ * @param {FXOSFastlist} el
  */
 function Internal(el) {
   var shadow = el.shadowRoot;
@@ -569,8 +598,8 @@ function Internal(el) {
     overlay: shadow.querySelector('.overlay'),
     overlayIcon: shadow.querySelector('.overlay > .icon'),
     overlayText: shadow.querySelector('.overlay > .text'),
-    container: shadow.querySelector('.fast-list'),
-    listContent: shadow.querySelector('.fast-list content'),
+    container: shadow.querySelector('.fastlist'),
+    listContent: shadow.querySelector('.fastlist content'),
     pickerItems: []
   };
 
@@ -731,7 +760,7 @@ Internal.prototype = {
    *
    * Users can provide templates by
    * placing <template> in the root
-   * of their <gaia-fast-list>
+   * of their <fxos-fastlist>
    *
    * @private
    */
@@ -762,8 +791,8 @@ Internal.prototype = {
    */
   createItem() {
     debug('create item');
-    this.parsedItem = this.parsedItem || poplar.parse(this.templateItem);
-    var el = poplar.create(this.parsedItem.cloneNode(true));
+    this.parsedItem = this.parsedItem || popel.parse(this.templateItem);
+    var el = popel.create(this.parsedItem.cloneNode(true));
     el[keys.img] = el.querySelector('img');
     el.classList.add('gfl-item');
     return el;
@@ -777,9 +806,9 @@ Internal.prototype = {
    */
   createSection(name) {
     this.parsedSection = this.parsedSection
-      || poplar.parse(this.templateHeader);
+      || popel.parse(this.templateHeader);
 
-    var header = poplar.create(this.parsedSection.cloneNode(true));
+    var header = popel.create(this.parsedSection.cloneNode(true));
     var section = document.createElement('div');
 
     header.classList.add('gfl-header');
@@ -794,7 +823,7 @@ Internal.prototype = {
    * Populates a list-item with data.
    *
    * If items were inflated from the HTML cache
-   * they won't yet be poplar elements; in
+   * they won't yet be popel elements; in
    * which case we have to replace them
    * before we can populate them with data.
    *
@@ -803,7 +832,7 @@ Internal.prototype = {
    */
   populateItem(el, i) {
     var record = this.getRecordAt(i);
-    poplar.populate(el, record);
+    popel.populate(el, record);
     el.classList.toggle('first', !!record[keys.first]);
   },
 
@@ -816,7 +845,7 @@ Internal.prototype = {
    * list is 'idle' (stopped or slow) so that
    * we don't harm scrolling performance.
    *
-   * NOTE: It seems sometimes fast-list may
+   * NOTE: It seems sometimes fastlist may
    * be calling this function more than
    * once per item. Need to look into this.
    *
@@ -1048,7 +1077,7 @@ Internal.prototype = {
    */
   populateSection(el, section) {
     var title = el.firstChild;
-    poplar.populate(title, { section: section });
+    popel.populate(title, { section: section });
   },
 
   /**
@@ -1062,7 +1091,7 @@ Internal.prototype = {
    *
    * NOTE: We use the innerHeight of the `parent`
    * window to prevent forcing a reflow when
-   * gaia-fast-list is inside an iframe. This
+   * fxos-fastlist is inside an iframe. This
    * means that offsets must be relative to
    * viewport *not* the closest window.
    *
@@ -1373,14 +1402,14 @@ Internal.prototype = {
     style.backgroundImage =
       `linear-gradient(
         to bottom,
-        var(--background),
-        var(--background) 100%),
+        var(--fxos-background),
+        var(--fxos-background) 100%),
       linear-gradient(
         to bottom,
         transparent,
         transparent 20%,
-        var(--border-color) 48%,
-        var(--border-color) 52%,
+        var(--fxos-border-color) 48%,
+        var(--fxos-border-color) 52%,
         transparent 80%,
         transparent 100%)`;
 
@@ -1658,11 +1687,11 @@ Internal.prototype = {
   },
 
   // Default header template overridden by
-  // <template header> inside <gaia-fast-list>
-  templateHeader: '<gaia-sub-header>${section}</gaia-sub-header>',
+  // <template header> inside <fxos-fastlist>
+  templateHeader: '<fxos-sub-header>${section}</fxos-sub-header>',
 
   // Default item template overridden by
-  // <template item> inside <gaia-fast-list>
+  // <template item> inside <fxos-fastlist>
   templateItem: '<a href="${link}"><div class="text"><h3>${title}</h3>' +
     '<p>${body}</p></div><div class="image"><img src="${image}"/></div></a>'
 };
@@ -1794,8 +1823,7 @@ Picker.prototype = {
  * Exports
  */
 
-module.exports = component.register('gaia-fast-list', GaiaFastListProto);
-module.exports.Internal = Internal; // test hook
+module.exports = component.register('fxos-fastlist', FXOSFastlistProto);
 
 /**
  * Utils
@@ -1824,8 +1852,3 @@ function Deferred() {
     this.reject = reject;
   });
 }
-
-});})(typeof define=='function'&&define.amd?define
-:(function(n,w){return typeof module=='object'?function(c){
-c(require,exports,module);}:function(c){var m={exports:{}};c(function(n){
-return w[n];},m.exports,m);w[n]=m.exports;};})('GaiaFastList',this));

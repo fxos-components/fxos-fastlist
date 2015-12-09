@@ -1,18 +1,18 @@
 /* global suite, sinon, setup, teardown,
-test, assert, GaiaFastList */
+test, assert, FXOSFastlist */
 
 /*jshint maxlen:false*/
 
-suite('GaiaFastList >>', function() {
+suite('fxos-fastlist >>', function() {
   'use strict';
-  var GaiaFastListProto = GaiaFastList.prototype;
+  var FXOSFastlistProto = FXOSFastlist.prototype;
   var utils = window['test-utils'];
   var afterNext = utils.afterNext;
   var dom;
 
   setup(function() {
     this.sinon = sinon.sandbox.create();
-    this.FastList = this.sinon.spy(GaiaFastListProto, 'FastList');
+    this.FastList = this.sinon.spy(FXOSFastlistProto, 'FastList');
     dom = document.createElement('div');
     document.body.appendChild(dom);
   });
@@ -919,7 +919,7 @@ suite('GaiaFastList >>', function() {
 
       return el.setModel(createModel())
         .then(() => {
-          var container = el.shadowRoot.querySelector('.fast-list');
+          var container = el.shadowRoot.querySelector('.fastlist');
           var list = el.shadowRoot.querySelector('ul');
 
           assert.equal(container.scrollTop, 50, 'real list has matching scrollTop');
@@ -961,7 +961,7 @@ suite('GaiaFastList >>', function() {
         });
     });
 
-    test('without cache it fires when fast-list\'s critical render has completed', function() {
+    test('without cache it fires when fastlist\'s critical render has completed', function() {
       var el = createList();
 
       el.setModel(createModel());
@@ -1042,7 +1042,7 @@ suite('GaiaFastList >>', function() {
     });
   });
 
-  suite('GaiaFastList#scrollTo() >>', function() {
+  suite('FXOSFastlist#scrollTo() >>', function() {
     var el;
 
     setup(function() {
@@ -1166,7 +1166,7 @@ suite('GaiaFastList >>', function() {
     attrs += ' style="width:300px;height:400px;"';
 
 
-    var html = '<gaia-fast-list ' + attrs + '>'
+    var html = '<fxos-fastlist ' + attrs + '>'
       +    '<template>'
       +      '<li ' + itemAttrs + '>'
       +        '<div class="image"><img/></div>'
@@ -1174,7 +1174,7 @@ suite('GaiaFastList >>', function() {
       +        '<p dir="auto">${body}</p>'
       +      '</li>'
       +    '</template>'
-      + '</gaia-fast-list>';
+      + '</fxos-fastlist>';
 
     dom.innerHTML = html;
     return dom.firstElementChild;

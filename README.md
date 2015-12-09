@@ -1,26 +1,26 @@
-[![](https://travis-ci.org/gaia-components/gaia-fast-list.svg)](https://travis-ci.org/gaia-components/gaia-fast-list) [![Coverage Status](https://coveralls.io/repos/gaia-components/gaia-fast-list/badge.svg?branch=master&service=github)](https://coveralls.io/github/gaia-components/gaia-fast-list?branch=master)
+[![](https://travis-ci.org/fxos-components/fxos-fastlist.svg)](https://travis-ci.org/fxos-components/fxos-fastlist) [![Coverage Status](https://coveralls.io/repos/fxos-components/fxos-fastlist/badge.svg?branch=master&service=github)](https://coveralls.io/github/fxos-components/fxos-fastlist?branch=master)
 
 ## Installation
 
 ```bash
-$ bower install gaia-components/gaia-fast-list
+$ npm install fxos-fastlist
 ```
 
 ## Usage
 
 ```html
-<gaia-fast-list>
+<fxos-fastlist>
   <template>
     <li>
       <h3>${title}</h3>
       <p>${body}</p>
     </li>
   </template>
-</gaia-fast-list>
+</fxos-fastlist>
 ```
 
 ```js
-var list = document.querySelector('gaia-fast-list');
+var list = document.querySelector('fxos-fastlist');
 
 // triggers render
 list.setModel([
@@ -57,7 +57,7 @@ GaiaFastList takes care of rendering images for you to ensure that scrolling per
 Place `<div class="image"><img/></div>` as the *first* child of your list-item template.
 
 ```html
-<gaia-fast-list>
+<fxos-fastlist>
   <template>
     <li>
       <div class="image"><img/></div>
@@ -65,7 +65,7 @@ Place `<div class="image"><img/></div>` as the *first* child of your list-item t
       <p>${body}</p>
     </li>
   </template>
-</gaia-fast-list>
+</fxos-fastlist>
 ```
 
 Then define a `.getItemImageSrc()` function that returns either a `String` or a `Blob`, sync or async (by returning a `Promise`).
@@ -81,11 +81,11 @@ list.configure({
 The optional caching feature will cache rendered list-items and section HTML in `localStorage`. On second render we inject the cached HTML right away for a really fast first-paint. This way the user see some content right away, giving you time to fetch your model behind the scenes.
 
 ```html
-<gaia-fast-list caching>
+<fxos-fastlist caching>
   <template>
     ...
   </template>
-</gaia-fast-list>
+</fxos-fastlist>
 ```
 
 ```js
@@ -103,11 +103,11 @@ list.clearCache();
 Defining `top` and `bottom` offsets avoids the component having to read dimensions from the DOM, which can be costly. The following example is for a list that occupies the entire vertical screen space.
 
 ```html
-<gaia-fast-list top="0" bottom="0">
+<fxos-fastlist top="0" bottom="0">
   <template>
     ...
   </template>
-</gaia-fast-list>
+</fxos-fastlist>
 ```
 
 ## Offsetting content
@@ -115,12 +115,12 @@ Defining `top` and `bottom` offsets avoids the component having to read dimensio
 Sometimes you may require elements other than list-items within your scrollable region (eg. a search field). The `offset` attribute allows you to define a value which all list content will be offset by. The value should usually be the height of your 'foreign' element.
 
 ```html
-<gaia-fast-list offset="50">
+<fxos-fastlist offset="50">
   <div style="height: 50px"></div>
   <template>
     ...
   </template>
-</gaia-fast-list>
+</fxos-fastlist>
 ```
 
 ## Tests
