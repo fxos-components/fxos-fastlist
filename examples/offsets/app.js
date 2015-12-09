@@ -1,5 +1,5 @@
 
-var list = document.querySelector('gaia-fast-list');
+var list = document.querySelector('fxos-fastlist');
 
 list.scrollTop = 50;
 list.minScrollHeight = 'calc(100% + 50px)';

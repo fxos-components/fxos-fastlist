@@ -8,18 +8,16 @@ module.exports = function(config) {
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
     frameworks: [
       'mocha',
-      'sinon-chai'
+      'chai-sinon'
     ],
 
     // list of files / patterns to load in the browser
     files: [
-      'bower_components/dom-scheduler/lib/dom-scheduler.js',
-      'bower_components/fast-list/fast-list.js',
-      'bower_components/gaia-component/gaia-component.js',
-      'bower_components/poplar/poplar.js',
-      'gaia-fast-list.js',
-      'bower_components/test-utils/src/utils.js',
-      'bower_components/gaia-theme/gaia-theme.css',
+      'node_modules/dom-scheduler/dom-scheduler.js',
+      'node_modules/fxos-component/fxos-component.js',
+      'fxos-fastlist.js',
+      'node_modules/test-utils/src/utils.js',
+      'node_modules/fxos-theme/fxos-theme.css',
       { pattern: 'test/lib/*.jpg', included: false },
       'test/test.css',
       'test/test.js'
@@ -34,7 +32,7 @@ module.exports = function(config) {
     ],
 
     preprocessors: {
-      'gaia-fast-list.js': ['coverage']
+      'fxos-fastlist.js': ['coverage']
     },
 
     coverageReporter: {

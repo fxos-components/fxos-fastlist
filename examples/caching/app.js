@@ -1,7 +1,7 @@
 'use strict';
 
-var debug = 0 ? (...args) => console.log('[GaiaFastListDemo]', ...args) : () => {};
-var list = document.querySelector('gaia-fast-list');
+var debug = 0 ? (...args) => console.log('[fxos-fastlist-demo]', ...args) : () => {};
+var list = document.querySelector('fxos-fastlist');
 
 // Defining getSectionName creates sections
 list.configure({

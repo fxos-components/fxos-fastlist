@@ -1,5 +1,5 @@
 
-var list = document.querySelector('gaia-fast-list');
+var list = document.querySelector('fxos-fastlist');
 list.setModel(getData());
 
 function getData() {

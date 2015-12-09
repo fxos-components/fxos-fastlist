@@ -1,5 +1,5 @@
 
-var list = document.querySelector('gaia-fast-list');
+var list = document.querySelector('fxos-fastlist');
 
 list.configure({
   getItemImageSrc(data, i) { return 'images/artwork-' + (i % 10) + '.jpg'; },

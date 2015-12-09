@@ -1,32 +1,48 @@
 {
-  "name": "gaia-fast-list",
-  "main": "gaia-fast-list.js",
+  "name": "fxos-fastlist",
+  "main": "fxos-fastlist.js",
+  "browser": "src/fxos-fastlist.js",
   "version": "0.3.2",
+  "dependencies": {
+    "fastlist": "^1.0.3",
+    "fxos-component": "^1.0.0",
+    "fxos-sub-header": "^1.0.1",
+    "fxos-theme": "^2.0.1",
+    "popel": "^1.0.2"
+  },
   "devDependencies": {
-    "bower": "^1.5.2",
+    "chai": "^3.4.1",
     "coveralls": "^2.11.4",
-    "jshint": "^2.7.0",
+    "jshint": "^2.9.1-rc1",
     "karma": "^0.13.15",
-    "karma-chrome-launcher": "^0.1.4",
+    "karma-chai-sinon": "^0.1.5",
+    "karma-chrome-launcher": "^0.2.1",
     "karma-coverage": "^0.5.3",
     "karma-firefox-launcher": "^0.1.4",
     "karma-mocha": "^0.2.0",
-    "karma-sinon-chai": "^0.3.0",
-    "mozilla-download": "^1.1.1"
+    "mocha": "^2.3.4",
+    "mozilla-download": "^1.1.1",
+    "nws": "^0.6.1",
+    "sinon": "^1.17.2",
+    "sinon-chai": "^2.8.0",
+    "test-utils": "github:fxos-components/test-utils",
+    "webpack": "^1.12.9"
   },
   "scripts": {
-    "postinstall": "bower install",
-    "test-lint": "./node_modules/jshint/bin/jshint gaia-fast-list.js",
-    "test-dev": "./node_modules/karma/bin/karma start test/karma.conf",
-    "test-unit": "./node_modules/karma/bin/karma start test/karma.conf --single-run",
-    "test": "npm run test-unit && npm run test-lint",
-    "coveralls": "cat test/lcov.info | coveralls"
+    "start": "npm run -s watch & nws -p 8030 -d examples/ -o",
+    "test-lint": "jshint src/*.js",
+    "test-dev": "karma start test/karma.conf",
+    "test-unit": "karma start test/karma.conf --single-run",
+    "test": "npm run -s test-unit && npm run -s test-lint",
+    "coveralls": "cat test/lcov.info | coveralls",
+    "watch": "webpack -w",
+    "build": "webpack"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/gaia-components/gaia-fast-list.git"
+    "url": "git://github.com/fxos-components/fxos-fastlist.git"
   },
   "bugs": {
-    "url": "https://github.com/gaia-components/gaia-fast-list/issues"
+    "url": "https://github.com/fxos-components/fxos-fastlist/issues"
   }
 }

@@ -3,20 +3,32 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1">
-    <title>gaia-fast-list</title>
+    <title>fxos-fastlist</title>
 
-    <link rel="stylesheet" href="bower_components/gaia-theme/gaia-theme.css">
-    <link rel="stylesheet" href="app.css">
+    <link rel="stylesheet" href="node_modules/fxos-theme/fxos-theme.css">
+    <link rel="stylesheet" href="node_modules/fxos-font/fxos-font.css">
 
-    <script defer src="bower_components/dom-scheduler/lib/dom-scheduler.js"></script>
-    <script defer src="bower_components/gaia-component/gaia-component.js"></script>
-    <script defer src="bower_components/poplar/poplar.js"></script>
-    <script defer src="bower_components/fast-list/fast-list.js"></script>
-    <script defer src="gaia-fast-list.js"></script>
+    <script defer src="node_modules/dom-scheduler/dom-scheduler.js"></script>
+    <script defer src="node_modules/fxos-component/fxos-component.js"></script>
+    <script defer src="fxos-fastlist.js"></script>
     <script defer src="app.js"></script>
+    <style>
+      html,
+      body {
+        padding: 0;
+        margin: 0;
+
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+
+        font: 17px FiraSans;
+        background: var(--fxos-background);
+      }
+    </style>
   </head>
   <body class="theme-settings">
-    <gaia-fast-list top="0" bottom="0">
+    <fxos-fastlist top="0" bottom="0">
       <template>
         <li>
           <div class="text">
@@ -26,6 +38,6 @@
           <div class="image round"></div>
         </li>
       </template>
-    </gaia-fast-list>
+    </fxos-fastlist>
   </body>
 </html>
